@@ -28,9 +28,6 @@ def worker_name(queue_name: str) -> str:
 
 
 def claim_next_job(queue_name: str, worker: str):
-    """
-    Atomically claim the oldest queued job for this worker queue.
-    """
     with connection() as conn:
         cur = conn.cursor()
 
@@ -51,9 +48,9 @@ def claim_next_job(queue_name: str, worker: str):
                 status = 'running',
                 locked_by = %s,
                 locked_at = NOW(),
-                started_at = NOW(),
                 attempts = attempts + 1,
-                updated_at = NOW()
+                updated_at = NOW(),
+                last_error = NULL
             WHERE job_id = (
                 SELECT job_id
                 FROM next_job
@@ -84,7 +81,8 @@ def mark_completed(job_id) -> None:
             UPDATE jobs
             SET
                 status = 'completed',
-                finished_at = NOW(),
+                locked_by = NULL,
+                locked_at = NULL,
                 updated_at = NOW(),
                 last_error = NULL
             WHERE job_id = %s
@@ -104,7 +102,8 @@ def mark_failed(job_id, error: str) -> None:
             UPDATE jobs
             SET
                 status = 'failed',
-                finished_at = NOW(),
+                locked_by = NULL,
+                locked_at = NULL,
                 updated_at = NOW(),
                 last_error = %s
             WHERE job_id = %s
@@ -122,11 +121,11 @@ def process_job(job_type: str, payload) -> None:
     """
     Temporary lifecycle test.
 
-    This confirms queued -> running -> completed before adding live FRED work.
+    This verifies queued -> running -> completed before live FRED execution.
     """
     if job_type != "fred_ingestion":
         raise NotImplementedError(
-            f"No test handler registered for job_type='{job_type}'."
+            f"No handler registered for job_type='{job_type}'."
         )
 
     time.sleep(2)
