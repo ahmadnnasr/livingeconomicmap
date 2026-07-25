@@ -22,36 +22,37 @@ class JobRepository:
     Repository for interacting with the persistent jobs queue.
     """
 
-    def enqueue_job(
-        self,
-        job_type: str,
-        payload: dict[str, Any] | None = None,
-    ) -> str:
+def enqueue_job(
+    self,
+    queue: str,
+    job_type: str,
+    payload: dict[str, Any] | None = None,
+) -> str:
+    payload = payload or {}
 
-        payload = payload or {}
-
-        with connection() as conn:
-            cur = conn.cursor()
-
-            cur.execute(
-                """
-                INSERT INTO jobs (
-                    job_type,
-                    payload
-                )
-                VALUES (%s, %s)
-                RETURNING id
-                """,
-                (
-                    job_type,
-                    json.dumps(payload),
-                ),
+    with connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO jobs (
+                queue,
+                job_type,
+                payload
             )
+            VALUES (%s, %s, %s::jsonb)
+            RETURNING id
+            """,
+            (
+                queue,
+                job_type,
+                json.dumps(payload),
+            ),
+        )
 
-            job_id = cur.fetchone()[0]
-            conn.commit()
+        job_id = cur.fetchone()[0]
+        conn.commit()
 
-        return str(job_id)
+    return str(job_id)
 
     def list_queued(self) -> list[Job]:
 
