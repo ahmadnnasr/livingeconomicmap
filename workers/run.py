@@ -6,6 +6,7 @@ import signal
 import socket
 import time
 import traceback
+from typing import Any
 
 from app.db import connection
 
@@ -27,7 +28,10 @@ def worker_name(queue_name: str) -> str:
     return f"{queue_name}-{socket.gethostname()}"
 
 
-def claim_next_job(queue_name: str, worker: str):
+def claim_next_job(
+    queue_name: str,
+    worker: str,
+):
     with connection() as conn:
         cur = conn.cursor()
 
@@ -58,7 +62,9 @@ def claim_next_job(queue_name: str, worker: str):
             RETURNING
                 job_id,
                 job_type,
-                payload
+                payload,
+                attempts,
+                max_attempts
             """,
             (
                 queue_name,
@@ -93,42 +99,95 @@ def mark_completed(job_id) -> None:
         conn.commit()
 
 
-def mark_failed(job_id, error: str) -> None:
+def mark_failed(
+    job_id,
+    error: str,
+    attempts: int,
+    max_attempts: int,
+) -> None:
     with connection() as conn:
         cur = conn.cursor()
 
-        cur.execute(
-            """
-            UPDATE jobs
-            SET
-                status = 'failed',
-                locked_by = NULL,
-                locked_at = NULL,
-                updated_at = NOW(),
-                last_error = %s
-            WHERE job_id = %s
-            """,
-            (
-                error[:5000],
-                job_id,
-            ),
-        )
+        if attempts < max_attempts:
+            cur.execute(
+                """
+                UPDATE jobs
+                SET
+                    status = 'queued',
+                    locked_by = NULL,
+                    locked_at = NULL,
+                    run_after = NOW() + INTERVAL '60 seconds',
+                    updated_at = NOW(),
+                    last_error = %s
+                WHERE job_id = %s
+                """,
+                (
+                    error[:5000],
+                    job_id,
+                ),
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE jobs
+                SET
+                    status = 'failed',
+                    locked_by = NULL,
+                    locked_at = NULL,
+                    updated_at = NOW(),
+                    last_error = %s
+                WHERE job_id = %s
+                """,
+                (
+                    error[:5000],
+                    job_id,
+                ),
+            )
 
         conn.commit()
 
 
-def process_job(job_type: str, payload) -> None:
-    """
-    Temporary lifecycle test.
-
-    This verifies queued -> running -> completed before live FRED execution.
-    """
+def process_ingestion_job(
+    job_type: str,
+    payload: dict[str, Any] | None,
+) -> dict[str, Any]:
     if job_type != "fred_ingestion":
         raise NotImplementedError(
-            f"No handler registered for job_type='{job_type}'."
+            f"No ingestion handler registered for job_type='{job_type}'."
         )
 
-    ingest_priority_series()
+    from lemp_macro.live_fred import ingest_priority_series
+
+    payload = payload or {}
+
+    lookback_days = int(
+        payload.get(
+            "lookback_days",
+            2200,
+        )
+    )
+
+    return ingest_priority_series(
+        lookback_days=lookback_days,
+    )
+
+
+def process_job(
+    queue_name: str,
+    job_type: str,
+    payload: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if queue_name == "ingestion":
+        return process_ingestion_job(
+            job_type=job_type,
+            payload=payload,
+        )
+
+    raise NotImplementedError(
+        f"No handler registered for "
+        f"queue='{queue_name}', "
+        f"job_type='{job_type}'."
+    )
 
 
 def main() -> None:
@@ -167,17 +226,26 @@ def main() -> None:
                 time.sleep(5)
                 continue
 
-            job_id, job_type, payload = row
+            (
+                job_id,
+                job_type,
+                payload,
+                attempts,
+                max_attempts,
+            ) = row
 
             print(
-                f"job_claimed id={job_id} "
+                f"job_claimed "
+                f"id={job_id} "
                 f"queue={args.queue} "
-                f"type={job_type}",
+                f"type={job_type} "
+                f"attempt={attempts}/{max_attempts}",
                 flush=True,
             )
 
             try:
-                process_job(
+                result = process_job(
+                    queue_name=args.queue,
                     job_type=job_type,
                     payload=payload,
                 )
@@ -185,7 +253,10 @@ def main() -> None:
                 mark_completed(job_id)
 
                 print(
-                    f"job_completed id={job_id}",
+                    f"job_completed "
+                    f"id={job_id} "
+                    f"type={job_type} "
+                    f"result={result}",
                     flush=True,
                 )
 
@@ -195,18 +266,26 @@ def main() -> None:
                 mark_failed(
                     job_id=job_id,
                     error=error,
+                    attempts=attempts,
+                    max_attempts=max_attempts,
                 )
 
                 print(
-                    f"job_failed id={job_id}",
+                    f"job_processing_failed "
+                    f"id={job_id} "
+                    f"type={job_type} "
+                    f"attempt={attempts}/{max_attempts}\n"
+                    f"{error}",
                     flush=True,
                 )
 
         except Exception:
             print(
-                traceback.format_exc(),
+                "worker_polling_error\n"
+                + traceback.format_exc(),
                 flush=True,
             )
+
             time.sleep(5)
 
     print(
