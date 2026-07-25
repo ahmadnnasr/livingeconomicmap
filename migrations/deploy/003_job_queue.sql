@@ -4,7 +4,12 @@ CREATE TABLE IF NOT EXISTS jobs (
     job_type TEXT NOT NULL,
 
     status TEXT NOT NULL DEFAULT 'QUEUED'
-        CHECK (status IN ('QUEUED', 'RUNNING', 'COMPLETED', 'FAILED')),
+        CHECK (status IN (
+            'QUEUED',
+            'RUNNING',
+            'COMPLETED',
+            'FAILED'
+        )),
 
     payload JSONB NOT NULL DEFAULT '{}'::jsonb,
 
@@ -24,3 +29,6 @@ ON jobs(status);
 
 CREATE INDEX IF NOT EXISTS idx_jobs_created
 ON jobs(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_type
+ON jobs(job_type);
