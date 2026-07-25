@@ -7,41 +7,42 @@ import socket
 import time
 import traceback
 
-from lemp_queue.repository import JobRepository
+from lemp_queue.repository import Job, JobRepository
 
 
 running = True
 
 
-def stop(*_):
+def stop(*_args) -> None:
     global running
     running = False
 
 
 def worker_name(queue_name: str) -> str:
-    configured = os.getenv("WORKER_NAME")
+    configured_name = os.getenv("WORKER_NAME")
 
-    if configured:
-        return configured
+    if configured_name:
+        return configured_name
 
     return f"{queue_name}-{socket.gethostname()}"
 
 
-def handle_job(queue_name: str, job) -> None:
+def handle_job(queue_name: str, job: Job) -> None:
     """
-    Temporary job dispatcher.
+    Temporary dispatcher.
 
-    FRED execution is added in the next commit.
-    For now, claimed jobs fail clearly instead of being silently ignored.
+    Real handlers, including fred_ingestion, will be added in the next commit.
     """
-    raise RuntimeError(
-        f"No handler configured yet for queue={queue_name}, "
-        f"job_type={job.job_type}"
+    raise NotImplementedError(
+        f"No handler registered for "
+        f"queue='{queue_name}', "
+        f"job_type='{job.job_type}'."
     )
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
+
     parser.add_argument(
         "queue",
         choices=[
@@ -51,6 +52,7 @@ def main():
             "maintenance",
         ],
     )
+
     args = parser.parse_args()
 
     signal.signal(signal.SIGTERM, stop)
@@ -66,7 +68,7 @@ def main():
 
     while running:
         job = repository.claim_next_job(
-            job_type=args.queue,
+            queue=args.queue,
             worker=name,
         )
 
@@ -76,12 +78,15 @@ def main():
 
         print(
             f"job_claimed id={job.id} "
-            f"type={job.job_type} worker={name}",
+            f"queue={args.queue} "
+            f"type={job.job_type} "
+            f"worker={name}",
             flush=True,
         )
 
         try:
             handle_job(args.queue, job)
+
             repository.mark_completed(job.id)
 
             print(
@@ -90,9 +95,11 @@ def main():
             )
 
         except Exception as exc:
+            error_details = traceback.format_exc()
+
             repository.mark_failed(
                 job.id,
-                traceback.format_exc(),
+                error_details,
             )
 
             print(
@@ -100,7 +107,10 @@ def main():
                 flush=True,
             )
 
-    print("worker_stopped", flush=True)
+    print(
+        f"worker_stopped queue={args.queue} worker={name}",
+        flush=True,
+    )
 
 
 if __name__ == "__main__":
