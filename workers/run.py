@@ -128,7 +128,7 @@ def process_job(job_type: str, payload) -> None:
             f"No handler registered for job_type='{job_type}'."
         )
 
-    time.sleep(2)
+    ingest_priority_series()
 
 
 def main() -> None:
