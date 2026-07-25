@@ -1,6 +1,6 @@
 
 from fastapi import FastAPI, Depends, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from app.auth import require_auth
@@ -8,7 +8,7 @@ from app.settings import get_settings
 from app.queries import dashboard_state
 from app.db import connection
 
-app=FastAPI(title="Living Economic Map", version="3.50")
+app=FastAPI(title="Living Economic Map", version="3.51")
 templates=Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -29,3 +29,10 @@ def dashboard(request:Request,user=Depends(require_auth)):
 @app.get("/api/state")
 def api_state(user=Depends(require_auth)):
     return dashboard_state()
+
+
+@app.post("/admin/ingest/fred")
+def run_fred_ingestion(user=Depends(require_auth)):
+    from lemp_macro.live_fred import ingest_priority_series
+    ingest_priority_series()
+    return RedirectResponse(url="/", status_code=303)
