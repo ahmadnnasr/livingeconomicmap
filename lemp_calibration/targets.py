@@ -1,0 +1,68 @@
+from .models import CalibrationTarget
+
+
+MARKET_TARGETS = [
+    CalibrationTarget(
+        key="financial_conditions",
+        source_field="financial_conditions_index",
+        expected_direction=-1,
+        transform="change",
+        horizon_days=20,
+        weight=0.25,
+        description="Lower financial-conditions index means easier conditions.",
+    ),
+    CalibrationTarget(
+        key="high_yield_spreads",
+        source_field="high_yield_spread",
+        expected_direction=-1,
+        transform="change",
+        horizon_days=20,
+        weight=0.20,
+        description="Narrower high-yield spreads imply easier financing conditions.",
+    ),
+    CalibrationTarget(
+        key="investment_grade_spreads",
+        source_field="investment_grade_spread",
+        expected_direction=-1,
+        transform="change",
+        horizon_days=20,
+        weight=0.10,
+        description="Narrower investment-grade spreads imply easier financing conditions.",
+    ),
+    CalibrationTarget(
+        key="dollar_strength",
+        source_field="dollar_index",
+        expected_direction=-1,
+        transform="change",
+        horizon_days=20,
+        weight=0.10,
+        description="A weaker dollar is generally associated with easier global liquidity.",
+    ),
+    CalibrationTarget(
+        key="rate_volatility",
+        source_field="rate_volatility",
+        expected_direction=-1,
+        transform="change",
+        horizon_days=20,
+        weight=0.10,
+        description="Lower rate volatility supports risk-taking and valuation transmission.",
+    ),
+    CalibrationTarget(
+        key="growth_relative_performance",
+        source_field="growth_relative_return",
+        expected_direction=1,
+        transform="forward_return",
+        horizon_days=20,
+        weight=0.15,
+        description="Growth stocks should outperform when liquidity transmits through lower rate pressure.",
+    ),
+    CalibrationTarget(
+        key="equity_multiple_change",
+        source_field="equity_multiple_change",
+        expected_direction=1,
+        transform="forward_return",
+        horizon_days=20,
+        weight=0.10,
+        description="Valuation multiples should expand when financial conditions ease.",
+    ),
+]

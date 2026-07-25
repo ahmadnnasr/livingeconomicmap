@@ -1,0 +1,50 @@
+CORE_MACRO_SERIES = {
+    "rates_and_liquidity": [
+        "fred:DFF",
+        "fred:WALCL",
+        "fred:WTREGEN",
+        "fred:RRPONTSYD",
+        "fred:SOFR",
+        "fred:DGS2",
+        "fred:DGS10",
+        "fred:DFII10",
+    ],
+    "inflation": [
+        "bls:CUUR0000SA0",
+        "bls:CUSR0000SA0L1E",
+        "bls:WPUFD4",
+        "bea:PCEPI",
+        "bea:DPCCRV1Q225SBEA",
+    ],
+    "growth": [
+        "bea:GDPC1",
+        "bea:A191RL1Q225SBEA",
+        "fred:INDPRO",
+        "fred:RSAFS",
+        "census:MARTS:retail_sales",
+    ],
+    "employment": [
+        "bls:LNS14000000",
+        "bls:CES0000000001",
+        "bls:JTS000000000000000JOL",
+        "fred:ICSA",
+    ],
+    "credit": [
+        "fred:BAMLH0A0HYM2",
+        "fred:DRTSCILM",
+        "fred:DRTSCIS",
+        "fred:TOTBKCR",
+    ],
+    "energy": [
+        "eia:petroleum:price",
+        "eia:electricity:retail-sales",
+        "eia:natural-gas:price",
+    ],
+    "treasury": [
+        "treasury:yield_curve:2_year",
+        "treasury:yield_curve:10_year",
+        "treasury:yield_curve:30_year",
+        "treasury:operating_cash_balance",
+        "treasury:debt_outstanding",
+    ],
+}
