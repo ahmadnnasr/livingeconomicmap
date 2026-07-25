@@ -82,21 +82,18 @@ def run_fred_ingestion(
     user=Depends(require_auth),
 ):
     """
-    Queue a FRED ingestion job and return immediately.
-
-    This endpoint does not download FRED data itself. A background worker
-    will process the queued job in a later commit.
+    Queue a FRED ingestion job and immediately return to the dashboard.
     """
     with connection() as conn:
         cur = conn.cursor()
 
         cur.execute(
             """
-            SELECT id
+            SELECT job_id
             FROM jobs
             WHERE queue = %s
               AND job_type = %s
-              AND status IN ('QUEUED', 'RUNNING')
+              AND status IN ('queued', 'running')
             ORDER BY created_at DESC
             LIMIT 1
             """,
@@ -114,14 +111,22 @@ def run_fred_ingestion(
                 INSERT INTO jobs (
                     queue,
                     job_type,
+                    payload,
                     status,
-                    payload
+                    priority,
+                    attempts,
+                    max_attempts,
+                    run_after
                 )
                 VALUES (
                     %s,
                     %s,
-                    'QUEUED',
-                    %s::jsonb
+                    %s::jsonb,
+                    'queued',
+                    100,
+                    0,
+                    5,
+                    NOW()
                 )
                 """,
                 (
