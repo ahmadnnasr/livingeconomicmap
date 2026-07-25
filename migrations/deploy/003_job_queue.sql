@@ -3,7 +3,8 @@ CREATE TABLE IF NOT EXISTS jobs (
 
     job_type TEXT NOT NULL,
 
-    status TEXT NOT NULL DEFAULT 'QUEUED',
+status TEXT NOT NULL DEFAULT 'QUEUED'
+    CHECK (status IN ('QUEUED', 'RUNNING', 'COMPLETED', 'FAILED')),
 
     payload JSONB NOT NULL DEFAULT '{}'::jsonb,
 
