@@ -399,9 +399,7 @@ def ingest_priority_series(
         timeout=timeout,
         limits=limits,
         headers={
-            "User-Agent": "LivingEconomicMap/3.51",
             "Accept": "application/json",
-            "Connection": "close",
         },
         follow_redirects=True,
         http2=False,
