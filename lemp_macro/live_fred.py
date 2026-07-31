@@ -357,7 +357,7 @@ def _write_series(
 
 def ingest_priority_series(
     *,
-    lookback_days: int = 30,
+    lookback_days: int = 2200,
 ) -> dict[str, Any]:
     settings = get_settings()
 
