@@ -8,3 +8,13 @@
 .last-run{display:block;color:#5f7a99;font-size:11px;margin-top:4px}
 .toast{position:fixed;bottom:24px;right:24px;background:#102b3f;border:1px solid #37c7ad;color:#dffbf6;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 12px 30px #0007;opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .3s ease,transform .3s ease}
 .toast-show{opacity:1;transform:translateY(0)}
+.chartable{cursor:pointer;transition:background .15s ease}
+.chartable:hover{background:#132e46}
+.modal-overlay{position:fixed;inset:0;background:#00000099;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:50;padding:20px}
+.modal-overlay.modal-show{opacity:1;pointer-events:auto}
+.modal-box{background:#0d1e33;border:1px solid #223e5d;border-radius:16px;padding:24px;max-width:700px;width:100%;box-shadow:0 20px 60px #000a;position:relative}
+.modal-close{position:absolute;top:12px;right:16px;background:none;border:none;color:#8eabc5;font-size:24px;cursor:pointer;padding:0;line-height:1}
+.modal-close:hover{color:#e8eef8}
+.modal-box h3{margin:0 30px 4px 0;font-size:20px;color:#e8eef8;font-weight:700}
+.chart-meta{color:#8eabc5;font-size:13px;margin-bottom:12px}
+#chart-svg-container svg{width:100%;height:auto;display:block}
