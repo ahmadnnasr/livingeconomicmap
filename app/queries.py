@@ -288,17 +288,26 @@ def stocks_state():
         load_watchlist,
         recent_articles_for_watchlist,
         recent_articles_market,
+        recent_wiim_articles,
+        latest_bars_summary,
+    )
+
+    bars_rows = safe(
+        "SELECT MAX(created_at) AS ts FROM jobs WHERE queue = 'bars' AND job_type = 'bars_ingestion'"
     )
 
     return {
         "watchlist": load_watchlist(),
         "holdings_articles": recent_articles_for_watchlist(),
         "market_articles": recent_articles_market(),
+        "wiim_articles": recent_wiim_articles(),
         "digest": latest_news_digest(),
+        "bars_summary": latest_bars_summary(),
         "last_runs": {
             "holdings_ingestion": news_last_run("holdings"),
             "market_ingestion": news_last_run("market"),
             "digest": news_last_run(None),
+            "bars": bars_rows[0]["ts"] if bars_rows else None,
         },
     }
 
