@@ -131,7 +131,7 @@ def generate_narrative(
     cleaned = raw_text.replace("```json", "").replace("```", "").strip()
 
     try:
-        parsed = json.loads(cleaned)
+        parsed = json.loads(cleaned, strict=False)
     except json.JSONDecodeError as exc:
         raise NarrativeGenerationError(
             f"Could not parse model response as JSON: {exc}. "
