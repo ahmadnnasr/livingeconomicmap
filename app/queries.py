@@ -8,6 +8,32 @@ def safe(query, params=()):
         return []
 
 
+def public_conditions():
+    """
+    Curated, read-only subset of dashboard_state() safe to expose outside
+    the authenticated dashboard: latest macro observations, the current
+    regime, and top beliefs. Deliberately excludes jobs, publications,
+    gmail deliveries, and ingestion run internals.
+    """
+    return {
+        "macro": safe(
+            """
+            SELECT DISTINCT ON (s.series_id)
+                s.series_id, s.title, s.category, s.units, s.interpretation,
+                o.observation_date, o.value
+            FROM macro_series s
+            JOIN macro_observations o ON o.series_id=s.series_id
+            ORDER BY s.series_id, o.observation_date DESC, o.retrieved_at DESC
+            """
+        ),
+        "regime": safe(
+            "SELECT regime_key, probability, as_of FROM regimes ORDER BY as_of DESC LIMIT 1"
+        ),
+        "beliefs": safe(
+            "SELECT belief_key, probability, confidence, updated_at FROM beliefs ORDER BY updated_at DESC LIMIT 8"
+        ),
+    }
+
 def dashboard_state():
     return {
         "beliefs": safe("SELECT belief_key, probability, confidence, updated_at FROM beliefs ORDER BY updated_at DESC LIMIT 12"),
