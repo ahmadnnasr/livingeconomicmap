@@ -118,6 +118,28 @@ def persist_narrative(as_of_date: str, narrative: str, glossary: dict) -> str:
     return str(row[0]) if row else ""
 
 
+def persist_asset_analysis(as_of_date: str, analysis: dict) -> str:
+    with connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO publications (publication_type, subject, payload, status, model_version)
+            VALUES (%s, %s, %s::jsonb, %s, %s)
+            RETURNING publication_id
+            """,
+            (
+                "asset_regime_analysis",
+                f"Asset & regime analysis — {as_of_date}",
+                json.dumps({"as_of_date": as_of_date, **analysis}),
+                "rendered",
+                "asset_analysis_v1",
+            ),
+        )
+        row = cur.fetchone()
+        conn.commit()
+    return str(row[0]) if row else ""
+
+
 def persist_publication(brief, markdown: str) -> str:
     with connection() as conn:
         cur = conn.cursor()
