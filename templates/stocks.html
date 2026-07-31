@@ -1,7 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ settings.app_name }} · Stocks</title><link rel="stylesheet" href="/static/app.css"></head>
 <body><main><header><div><span class="eyebrow">LIVE RESEARCH OPERATING SYSTEM</span><h1>Stocks</h1><p>Corporate news, holdings digest, and general market feed — powered by Benzinga.</p></div><nav class="page-nav"><a href="/">Macro</a><a href="/stocks" class="active">Stocks</a></nav><div class="badge">{{ settings.app_env }}</div></header>
 
-<div class="view-toggle"><button id="tab-holdings" class="view-toggle-btn active" onclick="showView('holdings')">My Holdings</button><button id="tab-market" class="view-toggle-btn" onclick="showView('market')">General Market</button><button id="tab-wiim" class="view-toggle-btn" onclick="showView('wiim')">Why Is It Moving</button></div>
+<div class="view-toggle"><button id="tab-holdings" class="view-toggle-btn active" onclick="showView('holdings')">My Holdings</button><button id="tab-market" class="view-toggle-btn" onclick="showView('market')">General Market</button><button id="tab-wiim" class="view-toggle-btn" onclick="showView('wiim')">Why Is It Moving</button><button id="tab-discovery" class="view-toggle-btn" onclick="showView('discovery')">Discovery</button></div>
 
 <div id="view-holdings">
 
@@ -12,6 +12,13 @@
 
 <section><article><div class="section-head"><div><h2>Price Bars</h2><p class="empty">Daily OHLCV, ~3yr history, for your watchlist. <small class="last-run">Last run: {{ state.last_runs.bars|fmt_et }}</small></p></div><form method="post" action="/admin/run/bars-ingestion"><button type="submit">Run bars ingestion</button></form></div>
 {% for b in state.bars_summary %}<div class="row"><span>{{ b.ticker }} <small class="teaser">{{ b.bar_count }} bars · {{ b.earliest_date }} – {{ b.latest_date }}</small></span><b>{{ '%.2f'|format(b.latest_close) if b.latest_close else '—' }}</b></div>{% else %}<p class="empty">No price bars yet — run ingestion.</p>{% endfor %}
+</article></section>
+
+<section><article><div class="section-head"><div><h2>Earnings Calendar</h2><p class="empty">Upcoming dates + historical EPS surprises for your watchlist. <small class="last-run">Last run: {{ state.last_runs.earnings|fmt_et }}</small></p></div><form method="post" action="/admin/run/earnings-calendar"><button type="submit">Run earnings pull</button></form></div>
+<p class="concept-section-label">Upcoming</p>
+{% for e in state.upcoming_earnings %}<div class="row"><span>{{ e.ticker }} <small class="teaser">{{ e.period }} {{ e.period_year }} · {{ e.event_date }}{% if not e.date_confirmed %} (unconfirmed){% endif %}</small></span><b>{{ '%.2f'|format(e.eps_estimate) if e.eps_estimate else '—' }} est</b></div>{% else %}<p class="empty">No upcoming earnings on record.</p>{% endfor %}
+<p class="concept-section-label">Recent surprises</p>
+{% for e in state.historical_earnings %}<div class="row"><span>{{ e.ticker }} <small class="teaser">{{ e.period }} {{ e.period_year }} · {{ e.event_date }} · EPS {{ e.eps_actual }} vs est {{ e.eps_estimate }}</small></span><b>{{ '%.1f'|format(e.eps_surprise_percent) if e.eps_surprise_percent else '—' }}%</b></div>{% else %}<p class="empty">No historical surprises on record.</p>{% endfor %}
 </article></section>
 
 <section><article><div class="section-head"><div><h2>Holdings news feed</h2><p class="empty">Raw Benzinga headlines for your watchlist. <small class="last-run">Last run: {{ state.last_runs.holdings_ingestion|fmt_et }}</small></p></div><form method="post" action="/admin/run/news-ingestion"><input type="hidden" name="scope" value="holdings"><button type="submit">Run news ingestion</button></form></div>
@@ -40,16 +47,26 @@
 
 </div>
 
+<div id="view-discovery" style="display:none">
+
+<section><article><div class="section-head"><div><h2>Trending Tickers</h2><p class="empty">What's getting unusual attention today, independent of your watchlist. <small class="last-run">Last run: {{ state.last_runs.trending|fmt_et }}</small></p></div><form method="post" action="/admin/run/trending-tickers"><button type="submit">Run trending pull</button></form></div>
+{% for t in state.trending %}<div class="row"><span>{{ t.ticker }} <small class="teaser">{{ t.exchange }}</small></span><b>{{ t.mention_count }} mentions <small class="teaser">{{ '%+.1f'|format(t.pct_change) if t.pct_change is not none else '' }}%</small></b></div>{% else %}<p class="empty">No trending data yet — run a pull.</p>{% endfor %}
+</article></section>
+
+<section><article><div class="section-head"><div><h2>Rating Changes</h2><p class="empty">Meaningful analyst rating actions market-wide, last 7 days. <small class="last-run">Last run: {{ state.last_runs.ratings|fmt_et }}</small></p></div><form method="post" action="/admin/run/ratings-discovery"><button type="submit">Run ratings pull</button></form></div>
+{% for r in state.ratings %}<div class="row"><span><b>{{ r.ticker }}</b> <small class="teaser">{{ r.company_name }} · {{ r.action_company }}{% if r.action_pt %} · PT {{ r.action_pt }}{% endif %} · {{ r.analyst_firm }} · {{ r.rating_date }}</small></span><b>{{ r.rating_prior }} → {{ r.rating_current }}</b></div>{% else %}<p class="empty">No rating changes yet — run a pull.</p>{% endfor %}
+</article></section>
+
+</div>
+
 </main>
 <div id="job-toast" class="toast"></div>
 <script>
 function showView(view) {
-  document.getElementById('view-holdings').style.display = view === 'holdings' ? '' : 'none';
-  document.getElementById('view-market').style.display = view === 'market' ? '' : 'none';
-  document.getElementById('view-wiim').style.display = view === 'wiim' ? '' : 'none';
-  document.getElementById('tab-holdings').className = 'view-toggle-btn' + (view === 'holdings' ? ' active' : '');
-  document.getElementById('tab-market').className = 'view-toggle-btn' + (view === 'market' ? ' active' : '');
-  document.getElementById('tab-wiim').className = 'view-toggle-btn' + (view === 'wiim' ? ' active' : '');
+  ['holdings','market','wiim','discovery'].forEach(function(v){
+    document.getElementById('view-' + v).style.display = (v === view) ? '' : 'none';
+    document.getElementById('tab-' + v).className = 'view-toggle-btn' + (v === view ? ' active' : '');
+  });
 }
 
 (function(){
