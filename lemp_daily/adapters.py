@@ -67,6 +67,57 @@ def load_context(as_of_date: str) -> dict:
     }
 
 
+def load_snapshot() -> dict:
+    """
+    Full current-state snapshot for the narrative feature: latest macro
+    observations, beliefs, and regimes. Reuses the same DISTINCT ON
+    dedup pattern as the rest of this module and app/queries.py.
+    """
+    macro = fetch_all(
+        """
+        SELECT DISTINCT ON (s.series_id)
+            s.series_id, s.title, s.category, s.units,
+            o.observation_date, o.value
+        FROM macro_series s
+        JOIN macro_observations o ON o.series_id = s.series_id
+        ORDER BY s.series_id, o.observation_date DESC, o.retrieved_at DESC
+        """
+    )
+    return {
+        "macro": macro,
+        "beliefs": _latest_beliefs(),
+        "regimes": _latest_regimes(),
+    }
+
+
+def persist_narrative(as_of_date: str, narrative: str, glossary: dict) -> str:
+    with connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO publications (publication_type, subject, payload, status, model_version)
+            VALUES (%s, %s, %s::jsonb, %s, %s)
+            RETURNING publication_id
+            """,
+            (
+                "narrative_synthesis",
+                f"Narrative synthesis — {as_of_date}",
+                json.dumps(
+                    {
+                        "as_of_date": as_of_date,
+                        "narrative": narrative,
+                        "glossary": glossary,
+                    }
+                ),
+                "rendered",
+                "narrative_v1",
+            ),
+        )
+        row = cur.fetchone()
+        conn.commit()
+    return str(row[0]) if row else ""
+
+
 def persist_publication(brief, markdown: str) -> str:
     with connection() as conn:
         cur = conn.cursor()
