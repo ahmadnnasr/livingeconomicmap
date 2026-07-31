@@ -1,3 +1,4 @@
+
 from __future__ import annotations
  
 import argparse
@@ -205,6 +206,35 @@ def process_reasoning_job(
     return handler(job)
  
  
+def process_publication_job(
+    job_type: str,
+    payload: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if job_type != "daily_brief":
+        raise NotImplementedError(
+            f"No publication handler registered for job_type='{job_type}'."
+        )
+ 
+    from datetime import date as _date
+ 
+    from lemp_daily.adapters import load_context, persist_publication
+    from lemp_daily.briefing import DailyBriefGenerator
+ 
+    payload = payload or {}
+    as_of_date = payload.get("as_of_date") or _date.today().isoformat()
+ 
+    context = load_context(as_of_date)
+    generator = DailyBriefGenerator()
+    brief = generator.generate(context)
+    markdown = generator.render_markdown(brief)
+    publication_id = persist_publication(brief, markdown)
+ 
+    return {
+        "publication_id": publication_id,
+        "headline": brief.headline,
+    }
+ 
+ 
 def process_job(
     queue_name: str,
     job_type: str,
@@ -222,6 +252,12 @@ def process_job(
             job_type=job_type,
             payload=payload,
             job_id=job_id,
+        )
+ 
+    if queue_name == "publication":
+        return process_publication_job(
+            job_type=job_type,
+            payload=payload,
         )
  
     raise NotImplementedError(
@@ -338,3 +374,4 @@ def main() -> None:
  
 if __name__ == "__main__":
     main()
+ 
