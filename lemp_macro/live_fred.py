@@ -38,6 +38,22 @@ PRIORITY_SERIES: tuple[FredSeriesSpec, ...] = (
         "Higher values generally indicate more central-bank liquidity.",
     ),
     FredSeriesSpec(
+        "RESPPLLOPNWW",
+        "Reserve balances with Federal Reserve Banks",
+        "Millions of dollars",
+        "Weekly",
+        "Liquidity",
+        "Higher reserve balances generally indicate more central-bank liquidity.",
+    ),
+    FredSeriesSpec(
+        "SOFR",
+        "Secured overnight financing rate",
+        "Percent",
+        "Daily",
+        "Policy",
+        "Elevated SOFR relative to policy rate can indicate money-market funding stress.",
+    ),
+    FredSeriesSpec(
         "RRPONTSYD",
         "Overnight reverse repurchase agreements",
         "Billions of dollars",
