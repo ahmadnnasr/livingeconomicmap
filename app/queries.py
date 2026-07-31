@@ -100,6 +100,24 @@ def last_run_times():
     }
 
 
+def jobs_summary_text(jobs):
+    """Short 'N running · N queued' string for the toast, or None if
+    nothing is active — completed/failed rows don't count as active."""
+    active = {
+        row["status"]: row["count"]
+        for row in jobs
+        if row["status"] in ("queued", "running")
+    }
+    if not active:
+        return None
+    parts = []
+    if active.get("running"):
+        parts.append(f"{active['running']} running")
+    if active.get("queued"):
+        parts.append(f"{active['queued']} queued")
+    return " · ".join(parts)
+
+
 def dashboard_state():
     jobs = safe("SELECT status, COUNT(*) AS count FROM jobs GROUP BY status ORDER BY status")
     jobs_active = any(
@@ -111,6 +129,7 @@ def dashboard_state():
         "narrative": latest_narrative(),
         "last_runs": last_run_times(),
         "jobs_active": jobs_active,
+        "jobs_summary": jobs_summary_text(jobs),
         "beliefs": safe(
             """
             SELECT belief_key, probability, confidence, updated_at FROM (
@@ -127,9 +146,7 @@ def dashboard_state():
             ) t ORDER BY probability DESC LIMIT 12
             """
         ),
-        "jobs": jobs,
         "publications": safe("SELECT publication_id, publication_type, subject, status, created_at FROM publications ORDER BY created_at DESC LIMIT 10"),
-        "deliveries": safe("SELECT status, delivery_mode, message_id, draft_id, created_at FROM gmail_delivery_records ORDER BY created_at DESC LIMIT 10"),
         "macro": safe(
             """
             SELECT DISTINCT ON (s.series_id)
