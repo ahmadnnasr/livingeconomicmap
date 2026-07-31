@@ -1,0 +1,53 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ settings.app_name }} · Stocks</title><link rel="stylesheet" href="/static/app.css"></head>
+<body><main><header><div><span class="eyebrow">LIVE RESEARCH OPERATING SYSTEM</span><h1>Stocks</h1><p>Corporate news, holdings digest, and general market feed — powered by Benzinga.</p></div><nav class="page-nav"><a href="/">Macro</a><a href="/stocks" class="active">Stocks</a></nav><div class="badge">{{ settings.app_env }}</div></header>
+
+<div class="view-toggle"><button id="tab-holdings" class="view-toggle-btn active" onclick="showView('holdings')">My Holdings</button><button id="tab-market" class="view-toggle-btn" onclick="showView('market')">General Market</button></div>
+
+<div id="view-holdings">
+
+<section><article><h2>Watchlist</h2>
+<div class="watchlist-chips">{% for t in state.watchlist %}<span class="chip">{{ t }}<form method="post" action="/admin/watchlist/remove" class="chip-remove-form"><input type="hidden" name="ticker" value="{{ t }}"><button type="submit" aria-label="Remove {{ t }}">×</button></form></span>{% else %}<p class="empty">No tickers yet — add one below.</p>{% endfor %}</div>
+<form method="post" action="/admin/watchlist/add" class="add-ticker-form"><input type="text" name="ticker" placeholder="e.g. NVDA" maxlength="10" required><button type="submit">Add</button></form>
+</article></section>
+
+<section><article><div class="section-head"><div><h2>Holdings news feed</h2><p class="empty">Raw Benzinga headlines for your watchlist. <small class="last-run">Last run: {{ state.last_runs.holdings_ingestion|fmt_et }}</small></p></div><form method="post" action="/admin/run/news-ingestion"><input type="hidden" name="scope" value="holdings"><button type="submit">Run news ingestion</button></form></div>
+{% for a in state.holdings_articles %}<div class="row news-row"><span><b><a href="{{ a.url }}" target="_blank" rel="noopener">{{ a.title }}</a></b><small>{{ a.tickers|join(', ') }} · {{ a.published_at|fmt_et }}{% if a.author %} · {{ a.author }}{% endif %}</small>{% if a.teaser %}<small class="teaser">{{ a.teaser }}</small>{% endif %}</span></div>{% else %}<p class="empty">No holdings news yet — add tickers and run ingestion.</p>{% endfor %}
+</article></section>
+
+<section><article><div class="section-head"><div><h2>Holdings Digest</h2><p class="empty">AI-generated summary of the last 24h across your watchlist. <small class="last-run">Last run: {{ state.last_runs.digest|fmt_et }}</small></p></div><form method="post" action="/admin/run/news-digest" class="run-form"><button type="submit">Run digest</button><button type="submit" name="force" value="true" class="link-btn">regenerate anyway</button></form></div>
+{% if state.digest %}<p class="empty">{{ state.digest.ticker_count }} tickers · {{ state.digest.article_count }} articles considered</p><p class="narrative-body">{{ state.digest.digest }}</p>{% else %}<p class="empty">No digest generated yet.</p>{% endif %}
+</article></section>
+
+</div>
+
+<div id="view-market" style="display:none">
+
+<section><article><div class="section-head"><div><h2>General market news feed</h2><p class="empty">Everything Benzinga has, no ticker filter. Rolling 21-day retention. <small class="last-run">Last run: {{ state.last_runs.market_ingestion|fmt_et }}</small></p></div><form method="post" action="/admin/run/news-ingestion"><input type="hidden" name="scope" value="market"><button type="submit">Run news ingestion</button></form></div>
+{% for a in state.market_articles %}<div class="row news-row"><span><b><a href="{{ a.url }}" target="_blank" rel="noopener">{{ a.title }}</a></b><small>{{ a.tickers|join(', ') }} · {{ a.published_at|fmt_et }}{% if a.author %} · {{ a.author }}{% endif %}</small>{% if a.teaser %}<small class="teaser">{{ a.teaser }}</small>{% endif %}</span></div>{% else %}<p class="empty">No market news yet — run ingestion.</p>{% endfor %}
+</article></section>
+
+</div>
+
+</main>
+<div id="job-toast" class="toast"></div>
+<script>
+function showView(view) {
+  document.getElementById('view-holdings').style.display = view === 'holdings' ? '' : 'none';
+  document.getElementById('view-market').style.display = view === 'market' ? '' : 'none';
+  document.getElementById('tab-holdings').className = 'view-toggle-btn' + (view === 'holdings' ? ' active' : '');
+  document.getElementById('tab-market').className = 'view-toggle-btn' + (view === 'market' ? ' active' : '');
+}
+
+(function(){
+  var skipped = {{ (skipped or '')|tojson }};
+  if (!skipped) return;
+  var toast = document.getElementById('job-toast');
+  toast.textContent = 'Already ran today — skipped to avoid double API spend. Use "regenerate anyway" to force it.';
+  toast.className = 'toast toast-show';
+  setTimeout(function(){ toast.className = 'toast'; }, 6000);
+  if (window.history && window.history.replaceState) {
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+})();
+</script>
+</body></html>
