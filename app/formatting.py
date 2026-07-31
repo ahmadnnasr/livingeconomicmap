@@ -1,5 +1,21 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+EASTERN = ZoneInfo("America/New_York")
+
+
+def fmt_et(dt: datetime | None) -> str:
+    """Renders a timestamptz value (assumed UTC-aware from Postgres) in
+    US Eastern time with the correct EST/EDT label. 'Never' if not run yet."""
+    if dt is None:
+        return "Never"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    local = dt.astimezone(EASTERN)
+    return local.strftime("%b %d, %Y · %I:%M %p %Z")
+
 
 def fmt_macro(value: float, units: str | None) -> str:
     """

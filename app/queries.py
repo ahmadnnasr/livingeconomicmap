@@ -75,6 +75,31 @@ def public_conditions():
     }
 
 
+def last_run_times():
+    """
+    Most recent timestamp for each of the four triggerable actions,
+    regardless of whether that run succeeded — this answers "when did I
+    last click this button", not "when did it last succeed". Each is a
+    single scalar query against the table that action actually writes to.
+    """
+    ingestion = safe(
+        "SELECT started_at FROM macro_ingestion_runs ORDER BY started_at DESC LIMIT 1"
+    )
+    reasoning = safe("SELECT MAX(updated_at) AS ts FROM beliefs")
+    publication = safe(
+        "SELECT MAX(created_at) AS ts FROM publications WHERE publication_type = 'daily_brief'"
+    )
+    narrative = safe(
+        "SELECT MAX(created_at) AS ts FROM publications WHERE publication_type = 'narrative_synthesis'"
+    )
+    return {
+        "ingestion": ingestion[0]["started_at"] if ingestion else None,
+        "reasoning": reasoning[0]["ts"] if reasoning else None,
+        "publication": publication[0]["ts"] if publication else None,
+        "narrative": narrative[0]["ts"] if narrative else None,
+    }
+
+
 def dashboard_state():
     jobs = safe("SELECT status, COUNT(*) AS count FROM jobs GROUP BY status ORDER BY status")
     jobs_active = any(
@@ -84,6 +109,7 @@ def dashboard_state():
 
     return {
         "narrative": latest_narrative(),
+        "last_runs": last_run_times(),
         "jobs_active": jobs_active,
         "beliefs": safe(
             """
