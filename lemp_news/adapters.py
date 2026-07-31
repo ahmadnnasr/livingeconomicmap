@@ -14,6 +14,59 @@ def _safe_fetch(query, params=()):
         return []
 
 
+def persist_bars(ticker: str, bars: list[dict]) -> int:
+    """Upserts daily bars by (ticker, bar_date) — safe to re-run over
+    overlapping date ranges."""
+    written = 0
+    with connection() as conn:
+        cur = conn.cursor()
+        for bar in bars:
+            cur.execute(
+                """
+                INSERT INTO price_bars (ticker, bar_date, open, high, low, close, volume)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (ticker, bar_date) DO UPDATE SET
+                    open = EXCLUDED.open,
+                    high = EXCLUDED.high,
+                    low = EXCLUDED.low,
+                    close = EXCLUDED.close,
+                    volume = EXCLUDED.volume,
+                    fetched_at = NOW()
+                """,
+                (
+                    ticker,
+                    bar["bar_date"],
+                    bar.get("open"),
+                    bar.get("high"),
+                    bar.get("low"),
+                    bar.get("close"),
+                    bar.get("volume"),
+                ),
+            )
+            written += 1
+        conn.commit()
+    return written
+
+
+def latest_bars_summary() -> list[dict]:
+    """One row per watchlist ticker: latest close, its date, and how much
+    history is actually on hand — the small reference table shown on the
+    Stocks page."""
+    return _safe_fetch(
+        """
+        SELECT
+            ticker,
+            MAX(bar_date) AS latest_date,
+            (SELECT close FROM price_bars p2 WHERE p2.ticker = p.ticker ORDER BY bar_date DESC LIMIT 1) AS latest_close,
+            MIN(bar_date) AS earliest_date,
+            COUNT(*) AS bar_count
+        FROM price_bars p
+        GROUP BY ticker
+        ORDER BY ticker
+        """
+    )
+
+
 def load_watchlist() -> list[str]:
     rows = _safe_fetch("SELECT ticker FROM watchlist_tickers ORDER BY ticker")
     return [row["ticker"] for row in rows]
@@ -107,6 +160,22 @@ def _normalize_rows(rows: list[dict]) -> list[dict]:
         if "tickers" in row and isinstance(row["tickers"], str):
             row["tickers"] = json.loads(row["tickers"])
     return rows
+
+
+def recent_wiim_articles(limit: int = 30) -> list[dict]:
+    """Why Is It Moving items are just regular news articles tagged with
+    a 'WIIM' channel — no separate ingestion needed, just a filter on
+    data already pulled by news_ingestion."""
+    return _normalize_rows(_safe_fetch(
+        """
+        SELECT article_id, title, teaser, url, author, tickers, published_at
+        FROM news_articles
+        WHERE channels ? 'WIIM'
+        ORDER BY published_at DESC
+        LIMIT %s
+        """,
+        (limit,),
+    ))
 
 
 def recent_articles_for_watchlist(limit: int = 50) -> list[dict]:
