@@ -19,6 +19,7 @@
 .chart-meta{color:#8eabc5;font-size:13px;margin-bottom:12px}
 #modal-body svg{width:100%;height:auto;display:block}
 #hover-capture{cursor:crosshair}
+.chart-context{margin-top:16px;padding-top:4px;border-top:1px solid #203a57}
 .concept-section-label{font-family:inherit;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#62d4b5;margin:16px 0 4px}
 .concept-section-label:first-child{margin-top:4px}
 .concept-body{color:#dfe9f5;font-size:14px;line-height:1.6;margin:0}
