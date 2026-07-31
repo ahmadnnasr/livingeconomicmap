@@ -1,25 +1,30 @@
 from __future__ import annotations
-
 import json
-
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-
 from app.auth import require_auth
 from app.db import connection
-from app.queries import dashboard_state
+from app.queries import dashboard_state, public_conditions
 from app.settings import get_settings
-
 
 app = FastAPI(
     title="Living Economic Map",
     version="3.51",
 )
 
-templates = Jinja2Templates(directory="templates")
+# Scoped to browser-side reads of /api/public-conditions only — every other
+# route stays same-origin / HTTP-Basic protected as before.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET"],
+    allow_headers=["X-LEM-Key"],
+)
 
+templates = Jinja2Templates(directory="templates")
 app.mount(
     "/static",
     StaticFiles(directory="static"),
@@ -27,14 +32,25 @@ app.mount(
 )
 
 
+def require_public_key(x_lem_key: str | None = Header(default=None)):
+    """
+    Separate, low-privilege check for the public endpoint. Deliberately NOT
+    the same credentials as require_auth (those also gate /admin/ingest/fred).
+    If PUBLIC_CONDITIONS_KEY is unset, the endpoint is open — set it in
+    Railway once you're ready to lock this down.
+    """
+    settings = get_settings()
+    if settings.public_conditions_key and x_lem_key != settings.public_conditions_key:
+        raise HTTPException(status_code=401, detail="Invalid or missing X-LEM-Key")
+    return True
+
+
 @app.get("/health")
 def health():
     try:
         with connection() as conn:
             conn.cursor().execute("SELECT 1")
-
         database_status = "ok"
-
     except Exception as exc:
         return JSONResponse(
             {
@@ -43,7 +59,6 @@ def health():
             },
             status_code=503,
         )
-
     return {
         "status": "ok",
         "database": database_status,
@@ -77,6 +92,18 @@ def api_state(
     return dashboard_state()
 
 
+@app.get("/api/public-conditions")
+def api_public_conditions(
+    _ok=Depends(require_public_key),
+):
+    """
+    Read-only, CORS-enabled subset of dashboard_state() for external
+    consumers (e.g. the Analog Archive artifact). No admin actions live
+    behind this key.
+    """
+    return public_conditions()
+
+
 @app.post("/admin/ingest/fred")
 def run_fred_ingestion(
     user=Depends(require_auth),
@@ -86,7 +113,6 @@ def run_fred_ingestion(
     """
     with connection() as conn:
         cur = conn.cursor()
-
         cur.execute(
             """
             SELECT job_id
@@ -102,9 +128,7 @@ def run_fred_ingestion(
                 "fred_ingestion",
             ),
         )
-
         existing_job = cur.fetchone()
-
         if existing_job is None:
             cur.execute(
                 """
@@ -135,9 +159,7 @@ def run_fred_ingestion(
                     json.dumps({}),
                 ),
             )
-
             conn.commit()
-
     return RedirectResponse(
         url="/",
         status_code=303,
