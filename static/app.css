@@ -25,6 +25,25 @@
 .run-form{display:flex;align-items:center;gap:10px}
 .link-btn{background:none;border:none;color:#5f7a99;font-size:11px;text-decoration:underline;cursor:pointer;padding:0;font-weight:400}
 .link-btn:hover{color:#8eabc5}
+.page-nav{display:flex;gap:4px;align-items:center}
+.page-nav a{color:#8eabc5;text-decoration:none;font-size:13px;padding:6px 12px;border-radius:8px}
+.page-nav a.active{background:#132e46;color:#e8eef8;font-weight:600}
+.page-nav a:hover{color:#e8eef8}
+.view-toggle{display:flex;gap:8px;margin:0 0 16px}
+.view-toggle-btn{background:none;border:1px solid #223e5d;color:#8eabc5;padding:8px 16px;border-radius:10px;font-size:13px;cursor:pointer;font-weight:600}
+.view-toggle-btn.active{background:#132e46;color:#e8eef8;border-color:#37c7ad}
+.watchlist-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#132e46;border:1px solid #223e5d;border-radius:20px;padding:5px 6px 5px 14px;font-size:13px;color:#e8eef8;font-weight:600}
+.chip-remove-form{display:inline}
+.chip-remove-form button{background:#0d1e33;border:none;color:#8eabc5;width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1;padding:0}
+.chip-remove-form button:hover{background:#223e5d;color:#e8eef8}
+.add-ticker-form{display:flex;gap:8px}
+.add-ticker-form input{background:#0d1e33;border:1px solid #223e5d;color:#e8eef8;border-radius:8px;padding:8px 12px;font-size:13px;width:140px;text-transform:uppercase}
+.add-ticker-form button{background:#37c7ad;border:none;color:#07111f;border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer;font-size:13px}
+.news-row span{display:flex;flex-direction:column;gap:3px}
+.news-row a{color:#e8eef8;text-decoration:none}
+.news-row a:hover{color:#37c7ad;text-decoration:underline}
+.news-row .teaser{color:#8eabc5;font-size:12.5px;line-height:1.4;max-width:640px}
 .concept-section-label{font-family:inherit;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#62d4b5;margin:16px 0 4px}
 .concept-section-label:first-child{margin-top:4px}
 .concept-body{color:#dfe9f5;font-size:14px;line-height:1.6;margin:0}
