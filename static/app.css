@@ -18,6 +18,7 @@
 .modal-box h3{margin:0 30px 4px 0;font-size:20px;color:#e8eef8;font-weight:700}
 .chart-meta{color:#8eabc5;font-size:13px;margin-bottom:12px}
 #modal-body svg{width:100%;height:auto;display:block}
+#hover-capture{cursor:crosshair}
 .concept-section-label{font-family:inherit;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#62d4b5;margin:16px 0 4px}
 .concept-section-label:first-child{margin-top:4px}
 .concept-body{color:#dfe9f5;font-size:14px;line-height:1.6;margin:0}
