@@ -22,6 +22,9 @@
 .chart-context{margin-top:16px;padding-top:4px;border-top:1px solid #203a57}
 .asset-columns{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin:8px 0 4px}
 @media(max-width:760px){.asset-columns{grid-template-columns:1fr}}
+.run-form{display:flex;align-items:center;gap:10px}
+.link-btn{background:none;border:none;color:#5f7a99;font-size:11px;text-decoration:underline;cursor:pointer;padding:0;font-weight:400}
+.link-btn:hover{color:#8eabc5}
 .concept-section-label{font-family:inherit;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#62d4b5;margin:16px 0 4px}
 .concept-section-label:first-child{margin-top:4px}
 .concept-body{color:#dfe9f5;font-size:14px;line-height:1.6;margin:0}
