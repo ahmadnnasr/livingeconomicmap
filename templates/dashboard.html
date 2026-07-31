@@ -55,7 +55,7 @@ function fmtChartValue(v, units) {
   return v.toLocaleString();
 }
 
-function buildChartSVG(obs, units) {
+function computeScale(obs, units) {
   var W = 640, H = 260, padL = 56, padR = 16, padT = 16, padB = 28;
   var innerW = W - padL - padR, innerH = H - padT - padB;
   var values = obs.map(function (o) { return o.value; });
@@ -71,20 +71,29 @@ function buildChartSVG(obs, units) {
   function xAt(i) { return padL + (i / (obs.length - 1 || 1)) * innerW; }
   function yAt(v) { return padT + innerH - ((v - minV) / (maxV - minV)) * innerH; }
 
-  var linePoints = obs.map(function (o, i) { return xAt(i) + ',' + yAt(o.value); }).join(' ');
-  var areaPoints = linePoints + ' ' + xAt(obs.length - 1) + ',' + (padT + innerH) + ' ' + xAt(0) + ',' + (padT + innerH);
+  return {
+    W: W, H: H, padL: padL, padR: padR, padT: padT, padB: padB,
+    innerW: innerW, innerH: innerH, minV: minV, maxV: maxV,
+    zeroCrossing: zeroCrossing, xAt: xAt, yAt: yAt
+  };
+}
 
-  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">';
+function buildChartSVG(obs, units) {
+  var s = computeScale(obs, units);
+  var linePoints = obs.map(function (o, i) { return s.xAt(i) + ',' + s.yAt(o.value); }).join(' ');
+  var areaPoints = linePoints + ' ' + s.xAt(obs.length - 1) + ',' + (s.padT + s.innerH) + ' ' + s.xAt(0) + ',' + (s.padT + s.innerH);
 
-  [minV, (minV + maxV) / 2, maxV].forEach(function (v) {
-    var y = yAt(v);
-    svg += '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" stroke="#203a57" stroke-width="1"/>';
+  var svg = '<svg id="chart-svg" viewBox="0 0 ' + s.W + ' ' + s.H + '" xmlns="http://www.w3.org/2000/svg">';
+
+  [s.minV, (s.minV + s.maxV) / 2, s.maxV].forEach(function (v) {
+    var y = s.yAt(v);
+    svg += '<line x1="' + s.padL + '" y1="' + y + '" x2="' + (s.W - s.padR) + '" y2="' + y + '" stroke="#203a57" stroke-width="1"/>';
     svg += '<text x="4" y="' + (y + 4) + '" fill="#8eabc5" font-size="10">' + fmtChartValue(v, units) + '</text>';
   });
 
-  if (zeroCrossing) {
-    var zy = yAt(0);
-    svg += '<line x1="' + padL + '" y1="' + zy + '" x2="' + (W - padR) + '" y2="' + zy + '" stroke="#c98a5f" stroke-width="1" stroke-dasharray="4,3"/>';
+  if (s.zeroCrossing) {
+    var zy = s.yAt(0);
+    svg += '<line x1="' + s.padL + '" y1="' + zy + '" x2="' + (s.W - s.padR) + '" y2="' + zy + '" stroke="#c98a5f" stroke-width="1" stroke-dasharray="4,3"/>';
   }
 
   svg += '<polygon points="' + areaPoints + '" fill="#37c7ad22" stroke="none"/>';
@@ -92,11 +101,88 @@ function buildChartSVG(obs, units) {
 
   var firstDate = obs[0] ? obs[0].date : '';
   var lastDate = obs[obs.length - 1] ? obs[obs.length - 1].date : '';
-  svg += '<text x="' + padL + '" y="' + (H - 8) + '" fill="#8eabc5" font-size="10">' + fmtChartDate(firstDate) + '</text>';
-  svg += '<text x="' + (W - padR) + '" y="' + (H - 8) + '" fill="#8eabc5" font-size="10" text-anchor="end">' + fmtChartDate(lastDate) + '</text>';
+  svg += '<text x="' + s.padL + '" y="' + (s.H - 8) + '" fill="#8eabc5" font-size="10">' + fmtChartDate(firstDate) + '</text>';
+  svg += '<text x="' + (s.W - s.padR) + '" y="' + (s.H - 8) + '" fill="#8eabc5" font-size="10" text-anchor="end">' + fmtChartDate(lastDate) + '</text>';
+
+  svg += '<g id="hover-group" opacity="0" pointer-events="none">';
+  svg += '<line id="hover-line" x1="0" y1="' + s.padT + '" x2="0" y2="' + (s.padT + s.innerH) + '" stroke="#8eabc5" stroke-width="1" stroke-dasharray="3,3"/>';
+  svg += '<circle id="hover-dot" r="4" fill="#37c7ad" stroke="#07111f" stroke-width="1.5"/>';
+  svg += '<rect id="hover-label-bg" rx="4" ry="4" fill="#0d1e33" stroke="#223e5d"/>';
+  svg += '<text id="hover-label-text" fill="#e8eef8" font-size="11"></text>';
+  svg += '</g>';
+
+  svg += '<rect id="hover-capture" x="' + s.padL + '" y="' + s.padT + '" width="' + s.innerW + '" height="' + s.innerH + '" fill="transparent"/>';
 
   svg += '</svg>';
   return svg;
+}
+
+function attachHoverHandlers(obs, units) {
+  var svg = document.getElementById('chart-svg');
+  var capture = document.getElementById('hover-capture');
+  if (!svg || !capture || !obs.length) return;
+
+  var s = computeScale(obs, units);
+  var group = document.getElementById('hover-group');
+  var line = document.getElementById('hover-line');
+  var dot = document.getElementById('hover-dot');
+  var labelBg = document.getElementById('hover-label-bg');
+  var labelText = document.getElementById('hover-label-text');
+
+  function pointFromEvent(clientX, clientY) {
+    var pt = svg.createSVGPoint();
+    pt.x = clientX;
+    pt.y = clientY;
+    var ctm = svg.getScreenCTM();
+    if (!ctm) return null;
+    return pt.matrixTransform(ctm.inverse());
+  }
+
+  function showAt(clientX, clientY) {
+    var loc = pointFromEvent(clientX, clientY);
+    if (!loc) return;
+    var ratio = (loc.x - s.padL) / s.innerW;
+    var idx = Math.round(ratio * (obs.length - 1));
+    idx = Math.max(0, Math.min(obs.length - 1, idx));
+    var o = obs[idx];
+    var x = s.xAt(idx), y = s.yAt(o.value);
+
+    line.setAttribute('x1', x);
+    line.setAttribute('x2', x);
+    dot.setAttribute('cx', x);
+    dot.setAttribute('cy', y);
+
+    var label = fmtChartDate(o.date) + '  ·  ' + fmtChartValue(o.value, units);
+    labelText.textContent = label;
+    var textWidth = label.length * 6.2 + 16;
+    var boxX = x + 8;
+    if (boxX + textWidth > s.W - 4) boxX = x - textWidth - 8;
+    var boxY = Math.max(s.padT, y - 24);
+    labelBg.setAttribute('x', boxX);
+    labelBg.setAttribute('y', boxY);
+    labelBg.setAttribute('width', textWidth);
+    labelBg.setAttribute('height', 20);
+    labelText.setAttribute('x', boxX + 8);
+    labelText.setAttribute('y', boxY + 14);
+
+    group.setAttribute('opacity', '1');
+  }
+
+  function hide() {
+    group.setAttribute('opacity', '0');
+  }
+
+  capture.addEventListener('mousemove', function (evt) {
+    showAt(evt.clientX, evt.clientY);
+  });
+  capture.addEventListener('mouseleave', hide);
+  capture.addEventListener('touchstart', function (evt) {
+    if (evt.touches && evt.touches[0]) showAt(evt.touches[0].clientX, evt.touches[0].clientY);
+  }, { passive: true });
+  capture.addEventListener('touchmove', function (evt) {
+    if (evt.touches && evt.touches[0]) showAt(evt.touches[0].clientX, evt.touches[0].clientY);
+  }, { passive: true });
+  capture.addEventListener('touchend', hide);
 }
 
 function openChart(seriesId) {
@@ -124,6 +210,7 @@ function openChart(seriesId) {
       var latest = obs[obs.length - 1];
       metaEl.textContent = obs.length + ' observations · ' + fmtChartDate(obs[0].date) + ' – ' + fmtChartDate(latest.date) + ' · latest: ' + fmtChartValue(latest.value, data.units);
       container.innerHTML = buildChartSVG(obs, data.units);
+      attachHoverHandlers(obs, data.units);
     })
     .catch(function (err) {
       titleEl.textContent = 'Error';
