@@ -181,6 +181,73 @@ def run_reasoning(
     )
  
  
+@app.post("/admin/run/publication")
+def run_publication(
+    user=Depends(require_auth),
+):
+    """
+    Queue a daily-brief publication job. Gmail delivery is deliberately
+    NOT triggered here — gmail_delivery_enabled is false, and lemp_gmail's
+    provider is an unimplemented stub, so this only ever writes a
+    publications row, never attempts to send anything.
+    """
+    from datetime import date as _date
+ 
+    with connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT job_id
+            FROM jobs
+            WHERE queue = %s
+              AND job_type = %s
+              AND status IN ('queued', 'running')
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (
+                "publication",
+                "daily_brief",
+            ),
+        )
+        existing_job = cur.fetchone()
+        if existing_job is None:
+            cur.execute(
+                """
+                INSERT INTO jobs (
+                    queue,
+                    job_type,
+                    payload,
+                    status,
+                    priority,
+                    attempts,
+                    max_attempts,
+                    run_after
+                )
+                VALUES (
+                    %s,
+                    %s,
+                    %s::jsonb,
+                    'queued',
+                    100,
+                    0,
+                    5,
+                    NOW()
+                )
+                """,
+                (
+                    "publication",
+                    "daily_brief",
+                    json.dumps({"as_of_date": _date.today().isoformat()}),
+                ),
+            )
+            conn.commit()
+    return RedirectResponse(
+        url="/",
+        status_code=303,
+    )
+ 
+ 
 @app.post("/admin/ingest/fred")
 def run_fred_ingestion(
     user=Depends(require_auth),
@@ -246,4 +313,3 @@ def run_fred_ingestion(
         url="/",
         status_code=303,
     )
- 
