@@ -123,6 +123,7 @@ def macro_series_history(series_id: str):
         "title": meta.get("title", series_id),
         "category": meta.get("category"),
         "units": meta.get("units"),
+        "interpretation": meta.get("interpretation"),
         "observations": [
             {"date": row["observation_date"].isoformat(), "value": row["value"]}
             for row in obs_rows
