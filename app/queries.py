@@ -1,6 +1,35 @@
 import json as _json
+from datetime import datetime, timezone as _timezone
+from zoneinfo import ZoneInfo as _ZoneInfo
 
 from app.db import fetch_all
+
+_EASTERN = _ZoneInfo("America/New_York")
+
+
+def ran_today(publication_type: str) -> bool:
+    """
+    True if a publication of this type already exists with a created_at
+    falling on today's date in Eastern time. Used to guard the two
+    API-billed features (narrative, asset analysis) against accidental
+    repeat spend from a double-click or a debugging session — not a hard
+    block, callers can still force a fresh run.
+    """
+    rows = safe(
+        """
+        SELECT MAX(created_at) AS ts FROM publications
+        WHERE publication_type = %s
+        """,
+        (publication_type,),
+    )
+    ts = rows[0]["ts"] if rows else None
+    if ts is None:
+        return False
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=_timezone.utc)
+    last_date = ts.astimezone(_EASTERN).date()
+    today = datetime.now(_EASTERN).date()
+    return last_date == today
 
 
 def safe(query, params=()):
@@ -162,6 +191,33 @@ def macro_series_history(series_id: str):
             for row in obs_rows
         ],
     }
+
+
+def concept_history(kind: str, key: str):
+    """
+    Full history of one belief or regime's probability over time — the
+    same rows that dashboard_state() already dedupes down to "latest
+    only" are the raw material for a trend chart here.
+    """
+    if kind == "belief":
+        rows = safe(
+            "SELECT updated_at, probability FROM beliefs WHERE belief_key = %s ORDER BY updated_at ASC",
+            (key,),
+        )
+        return [
+            {"date": row["updated_at"].date().isoformat(), "value": row["probability"]}
+            for row in rows
+        ]
+    if kind == "regime":
+        rows = safe(
+            "SELECT as_of, probability FROM regimes WHERE regime_key = %s ORDER BY as_of ASC",
+            (key,),
+        )
+        return [
+            {"date": row["as_of"].date().isoformat(), "value": row["probability"]}
+            for row in rows
+        ]
+    return []
 
 
 def jobs_summary_text(jobs):

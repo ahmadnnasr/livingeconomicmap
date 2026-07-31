@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from app.auth import require_auth
 from app.db import connection
 from app.formatting import fmt_et, fmt_macro, fmt_pct
-from app.queries import dashboard_state, macro_series_history, public_conditions
+from app.queries import concept_history, dashboard_state, macro_series_history, public_conditions, ran_today
 from app.settings import get_settings
 
 
@@ -93,6 +93,7 @@ def dashboard(
             "state": dashboard_state(),
             "settings": get_settings(),
             "user": user,
+            "skipped": request.query_params.get("skipped"),
         },
     )
 
@@ -106,6 +107,20 @@ def macro_history(
     dashboard. Same auth as the dashboard itself — not the CORS-enabled
     public-conditions route."""
     return macro_series_history(series_id)
+
+
+@app.get("/api/concept/{kind}/{key}/history")
+def concept_history_route(
+    kind: str,
+    key: str,
+    user=Depends(require_auth),
+):
+    """
+    Full probability history for one belief or regime, for the trend
+    chart in the concept modal. kind must be 'belief' or 'regime';
+    anything else returns an empty list rather than erroring.
+    """
+    return {"kind": kind, "key": key, "observations": concept_history(kind, key)}
 
 
 @app.get("/api/state")
@@ -262,14 +277,25 @@ def run_publication(
 
 @app.post("/admin/run/narrative")
 def run_narrative(
+    force: str | None = Form(default=None),
     user=Depends(require_auth),
 ):
     """
     Queue a narrative-synthesis job — calls the real Anthropic API
     server-side using ANTHROPIC_API_KEY. Fails loudly (job marked
     'failed', error visible in Postgres) if that key isn't set.
+
+    Guards against accidental repeat spend: skips enqueueing (no API
+    call, no cost) if one already ran today (Eastern time), unless
+    force=true was submitted from the "regenerate anyway" link.
     """
     from datetime import date as _date
+
+    if force != "true" and ran_today("narrative_synthesis"):
+        return RedirectResponse(
+            url="/?skipped=narrative",
+            status_code=303,
+        )
 
     with connection() as conn:
         cur = conn.cursor()
@@ -328,6 +354,7 @@ def run_narrative(
 
 @app.post("/admin/run/asset-analysis")
 def run_asset_analysis(
+    force: str | None = Form(default=None),
     user=Depends(require_auth),
 ):
     """
@@ -335,8 +362,20 @@ def run_asset_analysis(
     Anthropic API server-side with web search enabled, using
     ANTHROPIC_API_KEY. Same key as narrative synthesis; fails loudly
     (job marked 'failed', error visible in Postgres) if unset.
+
+    Guards against accidental repeat spend: skips enqueueing (no API
+    call, no cost) if one already ran today (Eastern time), unless
+    force=true was submitted from the "regenerate anyway" link. This
+    one's worth guarding especially — it's the more expensive call of
+    the two (web search + a larger token budget).
     """
     from datetime import date as _date
+
+    if force != "true" and ran_today("asset_regime_analysis"):
+        return RedirectResponse(
+            url="/?skipped=asset-analysis",
+            status_code=303,
+        )
 
     with connection() as conn:
         cur = conn.cursor()
