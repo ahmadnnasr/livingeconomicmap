@@ -59,6 +59,76 @@ def _compute_feature(feature: str, values: list[float]) -> float | None:
     return None
 
 
+def _series_history_asof(bare_series_id: str, cutoff_date: str) -> list[dict]:
+    """Same as _series_history but bounded to observation_date <= cutoff —
+    required for backtesting so a historical run only ever sees data that
+    would genuinely have existed on that date, not the full table up to
+    today."""
+    return fetch_all(
+        """
+        SELECT DISTINCT ON (observation_date)
+            observation_date, value
+        FROM macro_observations
+        WHERE series_id = %s AND observation_date <= %s
+        ORDER BY observation_date, retrieved_at DESC
+        """,
+        (bare_series_id, cutoff_date),
+    )
+
+
+def load_signals_asof(cutoff_date: str) -> list[dict]:
+    """
+    Backtesting variant of load_signals(): every feature (level, change_4,
+    z_score) is computed only from observations on or before cutoff_date.
+    load_signals() itself is NOT safe for this — it always pulls the full
+    history regardless of the as_of_date argument, so a naive "run it for
+    a past date" would silently leak future data into the z-scores and
+    changes. This function is the one that actually respects the cutoff.
+    """
+    signals: list[dict] = []
+    as_of = date.fromisoformat(cutoff_date)
+
+    for bare_id in REQUIRED_BARE_SERIES:
+        rows = _series_history_asof(bare_id, cutoff_date)
+        if not rows:
+            continue
+
+        values = [row["value"] for row in rows]
+        latest_date = rows[-1]["observation_date"]
+        freshness_days = (as_of - latest_date).days
+
+        spec = SERIES_SPECS[f"fred:{bare_id}"]
+        feature_value = _compute_feature(spec["feature"], values)
+
+        signal = {
+            "series_id": f"fred:{bare_id}",
+            "as_of_date": cutoff_date,
+            "level": values[-1],
+            "freshness_days": max(0, freshness_days),
+            "source_reliability": 1.0,
+        }
+        signal[spec["feature"]] = feature_value
+        signals.append(signal)
+
+    return signals
+
+
+def series_coverage() -> dict[str, dict]:
+    """Earliest/latest observation_date actually available per required
+    series — used by the backtest script to warn honestly when a
+    requested eval date predates the data on hand, rather than silently
+    running on partial coverage."""
+    coverage = {}
+    for bare_id in REQUIRED_BARE_SERIES:
+        rows = fetch_all(
+            "SELECT MIN(observation_date) AS earliest, MAX(observation_date) AS latest "
+            "FROM macro_observations WHERE series_id = %s",
+            (bare_id,),
+        )
+        coverage[bare_id] = rows[0] if rows else {"earliest": None, "latest": None}
+    return coverage
+
+
 def load_signals(as_of_date: str) -> list[dict]:
     """
     Build one signal dict per required series, matching the SeriesSignal
