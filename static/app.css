@@ -17,4 +17,8 @@
 .modal-close:hover{color:#e8eef8}
 .modal-box h3{margin:0 30px 4px 0;font-size:20px;color:#e8eef8;font-weight:700}
 .chart-meta{color:#8eabc5;font-size:13px;margin-bottom:12px}
-#chart-svg-container svg{width:100%;height:auto;display:block}
+#modal-body svg{width:100%;height:auto;display:block}
+.concept-section-label{font-family:inherit;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#62d4b5;margin:16px 0 4px}
+.concept-section-label:first-child{margin-top:4px}
+.concept-body{color:#dfe9f5;font-size:14px;line-height:1.6;margin:0}
+.concept-current{background:#0a2135;border:1px solid #223e5d;border-radius:10px;padding:12px 14px}
