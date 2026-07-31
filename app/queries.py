@@ -76,8 +76,15 @@ def public_conditions():
 
 
 def dashboard_state():
+    jobs = safe("SELECT status, COUNT(*) AS count FROM jobs GROUP BY status ORDER BY status")
+    jobs_active = any(
+        row["status"] in ("queued", "running") and row["count"] > 0
+        for row in jobs
+    )
+
     return {
         "narrative": latest_narrative(),
+        "jobs_active": jobs_active,
         "beliefs": safe(
             """
             SELECT belief_key, probability, confidence, updated_at FROM (
@@ -94,7 +101,7 @@ def dashboard_state():
             ) t ORDER BY probability DESC LIMIT 12
             """
         ),
-        "jobs": safe("SELECT status, COUNT(*) AS count FROM jobs GROUP BY status ORDER BY status"),
+        "jobs": jobs,
         "publications": safe("SELECT publication_id, publication_type, subject, status, created_at FROM publications ORDER BY created_at DESC LIMIT 10"),
         "deliveries": safe("SELECT status, delivery_mode, message_id, draft_id, created_at FROM gmail_delivery_records ORDER BY created_at DESC LIMIT 10"),
         "macro": safe(
