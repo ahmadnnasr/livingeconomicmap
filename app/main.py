@@ -326,6 +326,73 @@ def run_narrative(
     )
 
 
+@app.post("/admin/run/asset-analysis")
+def run_asset_analysis(
+    user=Depends(require_auth),
+):
+    """
+    Queue a historical-analog asset analysis job — calls the real
+    Anthropic API server-side with web search enabled, using
+    ANTHROPIC_API_KEY. Same key as narrative synthesis; fails loudly
+    (job marked 'failed', error visible in Postgres) if unset.
+    """
+    from datetime import date as _date
+
+    with connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT job_id
+            FROM jobs
+            WHERE queue = %s
+              AND job_type = %s
+              AND status IN ('queued', 'running')
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (
+                "publication",
+                "asset_regime_analysis",
+            ),
+        )
+        existing_job = cur.fetchone()
+        if existing_job is None:
+            cur.execute(
+                """
+                INSERT INTO jobs (
+                    queue,
+                    job_type,
+                    payload,
+                    status,
+                    priority,
+                    attempts,
+                    max_attempts,
+                    run_after
+                )
+                VALUES (
+                    %s,
+                    %s,
+                    %s::jsonb,
+                    'queued',
+                    100,
+                    0,
+                    5,
+                    NOW()
+                )
+                """,
+                (
+                    "publication",
+                    "asset_regime_analysis",
+                    json.dumps({"as_of_date": _date.today().isoformat()}),
+                ),
+            )
+            conn.commit()
+    return RedirectResponse(
+        url="/",
+        status_code=303,
+    )
+
+
 @app.post("/admin/ingest/fred")
 def run_fred_ingestion(
     user=Depends(require_auth),

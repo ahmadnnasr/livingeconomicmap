@@ -38,6 +38,35 @@ def latest_narrative():
     }
 
 
+def latest_asset_analysis():
+    """
+    Returns the most recent asset_regime_analysis publication with its
+    historical analogs, avoid/favored asset lists, and synthesis pulled
+    out of the JSONB payload, or None if none exists yet.
+    """
+    rows = safe(
+        """
+        SELECT payload, created_at FROM publications
+        WHERE publication_type = 'asset_regime_analysis'
+        ORDER BY created_at DESC LIMIT 1
+        """
+    )
+    if not rows:
+        return None
+
+    payload = rows[0]["payload"]
+    if isinstance(payload, str):
+        payload = _json.loads(payload)
+
+    return {
+        "historical_analogs": payload.get("historical_analogs", []),
+        "assets_to_avoid": payload.get("assets_to_avoid", []),
+        "assets_favored": payload.get("assets_favored", []),
+        "synthesis": payload.get("synthesis", ""),
+        "created_at": rows[0]["created_at"],
+    }
+
+
 def public_conditions():
     """
     Curated, read-only subset of dashboard_state() safe to expose outside
@@ -92,11 +121,15 @@ def last_run_times():
     narrative = safe(
         "SELECT MAX(created_at) AS ts FROM publications WHERE publication_type = 'narrative_synthesis'"
     )
+    asset_analysis = safe(
+        "SELECT MAX(created_at) AS ts FROM publications WHERE publication_type = 'asset_regime_analysis'"
+    )
     return {
         "ingestion": ingestion[0]["started_at"] if ingestion else None,
         "reasoning": reasoning[0]["ts"] if reasoning else None,
         "publication": publication[0]["ts"] if publication else None,
         "narrative": narrative[0]["ts"] if narrative else None,
+        "asset_analysis": asset_analysis[0]["ts"] if asset_analysis else None,
     }
 
 
@@ -158,6 +191,7 @@ def dashboard_state():
 
     return {
         "narrative": latest_narrative(),
+        "asset_analysis": latest_asset_analysis(),
         "last_runs": last_run_times(),
         "jobs_active": jobs_active,
         "jobs_summary": jobs_summary_text(jobs),
