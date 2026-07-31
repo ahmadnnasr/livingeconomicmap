@@ -2,8 +2,8 @@
 <body><main><header><div><span class="eyebrow">LIVE RESEARCH OPERATING SYSTEM</span><h1>{{ settings.app_name }}</h1><p>Macro evidence → beliefs → regimes → rankings → publications</p></div><div class="badge">{{ settings.app_env }}</div></header>
 <section><article><div class="section-head"><div><h2>Official macro data</h2><p class="empty">Latest validated readings from FRED. <small class="last-run">Last run: {{ state.last_runs.ingestion|fmt_et }}</small></p></div><form method="post" action="/admin/ingest/fred"><button type="submit">Run FRED ingestion</button></form></div>{% for x in state.macro %}<div class="row macro-row chartable" onclick="openChart('{{ x.series_id }}')"><span><b>{{ x.title }}</b><small>{{ x.series_id }} · {{ x.observation_date }} · {{ x.category }}</small></span><strong>{{ x.value|fmt_macro(x.units) }}</strong></div>{% else %}<p class="empty">No macro observations yet. Run the first FRED ingestion.</p>{% endfor %}</article></section>
 <section class="grid"><article><div class="section-head"><div><h2>Beliefs</h2><small class="last-run">Last run: {{ state.last_runs.reasoning|fmt_et }}</small></div><form method="post" action="/admin/run/reasoning"><button type="submit">Run reasoning</button></form></div>{% for x in state.beliefs %}<div class="row chartable" onclick="openConcept('{{ x.belief_key }}', {{ x.probability }})"><span>{{ x.belief_key }}</span><b>{{ x.probability|fmt_pct }}</b></div>{% else %}<p class="empty">No belief snapshots yet.</p>{% endfor %}</article><article><h2>Regimes</h2>{% for x in state.regimes %}<div class="row chartable" onclick="openConcept('{{ x.regime_key }}', {{ x.probability }})"><span>{{ x.regime_key }}</span><b>{{ x.probability|fmt_pct }}</b></div>{% else %}<p class="empty">No regime snapshots yet.</p>{% endfor %}</article></section>
-<section><article><div class="section-head"><div><h2>Narrative</h2><p class="empty">AI-generated synthesis of current conditions. <small class="last-run">Last run: {{ state.last_runs.narrative|fmt_et }}</small></p></div><form method="post" action="/admin/run/narrative"><button type="submit">Run narrative</button></form></div>{% if state.narrative %}<p class="narrative-body">{{ state.narrative.narrative }}</p><dl class="glossary">{% for key, definition in state.narrative.glossary.items() %}<dt>{{ key.replace('_', ' ') }}</dt><dd>{{ definition }}</dd>{% endfor %}</dl>{% else %}<p class="empty">No narrative generated yet.</p>{% endif %}</article></section>
-<section><article><div class="section-head"><div><h2>Historical Asset Analysis</h2><p class="empty">AI-generated, web-search-grounded historical analogs and asset-class patterns. Educational, not personalized financial advice. <small class="last-run">Last run: {{ state.last_runs.asset_analysis|fmt_et }}</small></p></div><form method="post" action="/admin/run/asset-analysis"><button type="submit">Run analysis</button></form></div>{% if state.asset_analysis %}<p class="concept-section-label">Historical analogs</p>{% for a in state.asset_analysis.historical_analogs %}<p class="concept-body"><b>{{ a.period }}</b> — {{ a.similarity }}</p>{% endfor %}<div class="asset-columns"><div><p class="concept-section-label">Historically struggled in this environment</p><dl class="glossary">{% for x in state.asset_analysis.assets_to_avoid %}<dt>{{ x.asset_class }}</dt><dd>{{ x.rationale }}</dd>{% endfor %}</dl></div><div><p class="concept-section-label">Historically held up or did well</p><dl class="glossary">{% for x in state.asset_analysis.assets_favored %}<dt>{{ x.asset_class }}</dt><dd>{{ x.rationale }}</dd>{% endfor %}</dl></div></div><p class="concept-section-label">Synthesis</p><p class="narrative-body">{{ state.asset_analysis.synthesis }}</p>{% else %}<p class="empty">No analysis generated yet.</p>{% endif %}</article></section>
+<section><article><div class="section-head"><div><h2>Narrative</h2><p class="empty">AI-generated synthesis of current conditions. <small class="last-run">Last run: {{ state.last_runs.narrative|fmt_et }}</small></p></div><form method="post" action="/admin/run/narrative" class="run-form"><button type="submit">Run narrative</button><button type="submit" name="force" value="true" class="link-btn">regenerate anyway</button></form></div>{% if state.narrative %}<p class="narrative-body">{{ state.narrative.narrative }}</p><dl class="glossary">{% for key, definition in state.narrative.glossary.items() %}<dt>{{ key.replace('_', ' ') }}</dt><dd>{{ definition }}</dd>{% endfor %}</dl>{% else %}<p class="empty">No narrative generated yet.</p>{% endif %}</article></section>
+<section><article><div class="section-head"><div><h2>Historical Asset Analysis</h2><p class="empty">AI-generated, web-search-grounded historical analogs and asset-class patterns. Educational, not personalized financial advice. <small class="last-run">Last run: {{ state.last_runs.asset_analysis|fmt_et }}</small></p></div><form method="post" action="/admin/run/asset-analysis" class="run-form"><button type="submit">Run analysis</button><button type="submit" name="force" value="true" class="link-btn">regenerate anyway</button></form></div>{% if state.asset_analysis %}<p class="concept-section-label">Historical analogs</p>{% for a in state.asset_analysis.historical_analogs %}<p class="concept-body"><b>{{ a.period }}</b> — {{ a.similarity }}</p>{% endfor %}<div class="asset-columns"><div><p class="concept-section-label">Historically struggled in this environment</p><dl class="glossary">{% for x in state.asset_analysis.assets_to_avoid %}<dt>{{ x.asset_class }}</dt><dd>{{ x.rationale }}</dd>{% endfor %}</dl></div><div><p class="concept-section-label">Historically held up or did well</p><dl class="glossary">{% for x in state.asset_analysis.assets_favored %}<dt>{{ x.asset_class }}</dt><dd>{{ x.rationale }}</dd>{% endfor %}</dl></div></div><p class="concept-section-label">Synthesis</p><p class="narrative-body">{{ state.asset_analysis.synthesis }}</p>{% else %}<p class="empty">No analysis generated yet.</p>{% endif %}</article></section>
 <section><article><h2>Recent ingestion</h2>{% for x in state.ingestion_runs %}<div class="row macro-row"><span><b>{{ x.provider }} · {{ x.status }}</b><small>{{ (x.completed_at or x.started_at)|fmt_et }}</small></span><strong>{{ x.series_succeeded }}/{{ x.series_requested }}</strong></div>{% else %}<p class="empty">No ingestion runs recorded.</p>{% endfor %}</article></section>
 <section><article><div class="section-head"><h2>Recent publications</h2><form method="post" action="/admin/run/publication"><button type="submit">Run publication</button></form></div>{% for x in state.publications %}<div class="row"><span>{{ x.subject }}</span><b>{{ x.status }}</b></div>{% else %}<p class="empty">No publications generated yet.</p>{% endfor %}</article></section>
 </main>
@@ -31,6 +31,19 @@
     toast.textContent = 'Completed';
     toast.className = 'toast toast-show';
     setTimeout(function(){ toast.className = 'toast'; }, 3000);
+  }
+})();
+
+(function(){
+  var skipped = {{ (skipped or '')|tojson }};
+  if (!skipped) return;
+  var toast = document.getElementById('job-toast');
+  var labels = { narrative: 'Narrative', 'asset-analysis': 'Asset analysis' };
+  toast.textContent = (labels[skipped] || skipped) + ' already ran today — skipped to avoid double API spend. Use "regenerate anyway" to force it.';
+  toast.className = 'toast toast-show';
+  setTimeout(function(){ toast.className = 'toast'; }, 6000);
+  if (window.history && window.history.replaceState) {
+    window.history.replaceState({}, '', window.location.pathname);
   }
 })();
 
@@ -606,7 +619,31 @@ function openConcept(key, prob) {
   html += '<p class="concept-body">' + concept.technical + '</p>';
   html += '<p class="concept-section-label">What ' + (prob * 100).toFixed(1) + '% means right now</p>';
   html += '<p class="concept-body concept-current">' + pickBand(concept.bands, prob) + '</p>';
+  html += '<div class="chart-context"><p class="concept-section-label">Trend over time</p><div id="concept-chart-slot"><p class="empty">Loading trend…</p></div></div>';
   container.innerHTML = html;
+
+  fetch('/api/concept/' + encodeURIComponent(concept.kind) + '/' + encodeURIComponent(key) + '/history')
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      var slot = document.getElementById('concept-chart-slot');
+      if (!slot) return;
+      var obs = (data.observations || []).map(function (o) {
+        return { date: o.date, value: o.value * 100 };
+      });
+      if (obs.length < 2) {
+        slot.innerHTML = '<p class="empty">Not enough history yet — run reasoning a few more times to build a trend.</p>';
+        return;
+      }
+      slot.innerHTML = buildChartSVG(obs, 'Percent');
+      attachHoverHandlers(obs, 'Percent');
+    })
+    .catch(function (err) {
+      var slot = document.getElementById('concept-chart-slot');
+      if (slot) slot.innerHTML = '<p class="empty">Could not load trend: ' + err + '</p>';
+    });
 }
 
 document.addEventListener('keydown', function (e) {
