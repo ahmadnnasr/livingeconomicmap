@@ -10,6 +10,7 @@ from fastapi.templating import Jinja2Templates
  
 from app.auth import require_auth
 from app.db import connection
+from app.formatting import fmt_macro, fmt_pct
 from app.queries import dashboard_state, public_conditions
 from app.settings import get_settings
  
@@ -29,6 +30,8 @@ app.add_middleware(
 )
  
 templates = Jinja2Templates(directory="templates")
+templates.env.filters["fmt_macro"] = fmt_macro
+templates.env.filters["fmt_pct"] = fmt_pct
  
 app.mount(
     "/static",
