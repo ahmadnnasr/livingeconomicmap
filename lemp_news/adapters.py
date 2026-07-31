@@ -67,6 +67,116 @@ def latest_bars_summary() -> list[dict]:
     )
 
 
+def persist_trending_snapshot(entries: list[dict]) -> int:
+    """Overwrites the whole snapshot each run — this is a point-in-time
+    discovery feed, not something that needs historical accumulation
+    the way news/bars do."""
+    with connection() as conn:
+        cur = conn.cursor()
+        cur.execute("TRUNCATE TABLE trending_tickers_snapshot")
+        for e in entries:
+            cur.execute(
+                """
+                INSERT INTO trending_tickers_snapshot (ticker, exchange, mention_count, pct_change)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (e.get("ticker"), e.get("exchange"), e.get("count"), e.get("pct_change")),
+            )
+        conn.commit()
+    return len(entries)
+
+
+def latest_trending_snapshot(limit: int = 25) -> list[dict]:
+    return _safe_fetch(
+        "SELECT ticker, exchange, mention_count, pct_change, snapshot_at FROM trending_tickers_snapshot ORDER BY mention_count DESC LIMIT %s",
+        (limit,),
+    )
+
+
+def persist_ratings_snapshot(entries: list[dict]) -> int:
+    with connection() as conn:
+        cur = conn.cursor()
+        cur.execute("TRUNCATE TABLE ratings_snapshot")
+        for e in entries:
+            cur.execute(
+                """
+                INSERT INTO ratings_snapshot (
+                    benzinga_id, ticker, company_name, rating_date, action_company,
+                    action_pt, rating_current, rating_prior, pt_current, pt_prior,
+                    analyst_name, analyst_firm, importance
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    e.get("benzinga_id"), e.get("ticker"), e.get("company_name"),
+                    e.get("rating_date"), e.get("action_company"), e.get("action_pt"),
+                    e.get("rating_current"), e.get("rating_prior"),
+                    e.get("pt_current"), e.get("pt_prior"),
+                    e.get("analyst_name"), e.get("analyst_firm"), e.get("importance"),
+                ),
+            )
+        conn.commit()
+    return len(entries)
+
+
+def latest_ratings_snapshot(limit: int = 30) -> list[dict]:
+    return _safe_fetch(
+        "SELECT * FROM ratings_snapshot ORDER BY rating_date DESC, importance DESC LIMIT %s",
+        (limit,),
+    )
+
+
+def persist_earnings(entries: list[dict]) -> int:
+    written = 0
+    with connection() as conn:
+        cur = conn.cursor()
+        for e in entries:
+            if not e.get("benzinga_id"):
+                continue
+            cur.execute(
+                """
+                INSERT INTO earnings_calendar (
+                    benzinga_id, ticker, company_name, event_date, date_confirmed,
+                    period, period_year, eps_estimate, eps_actual, eps_surprise_percent,
+                    revenue_estimate, revenue_actual, revenue_surprise_percent, importance
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (benzinga_id) DO UPDATE SET
+                    eps_actual = EXCLUDED.eps_actual,
+                    eps_surprise_percent = EXCLUDED.eps_surprise_percent,
+                    revenue_actual = EXCLUDED.revenue_actual,
+                    revenue_surprise_percent = EXCLUDED.revenue_surprise_percent,
+                    date_confirmed = EXCLUDED.date_confirmed,
+                    fetched_at = NOW()
+                """,
+                (
+                    e["benzinga_id"], e.get("ticker"), e.get("company_name"),
+                    e.get("event_date"), e.get("date_confirmed"),
+                    e.get("period"), e.get("period_year"),
+                    e.get("eps_estimate"), e.get("eps_actual"), e.get("eps_surprise_percent"),
+                    e.get("revenue_estimate"), e.get("revenue_actual"), e.get("revenue_surprise_percent"),
+                    e.get("importance"),
+                ),
+            )
+            written += 1
+        conn.commit()
+    return written
+
+
+def upcoming_earnings(limit: int = 20) -> list[dict]:
+    return _safe_fetch(
+        "SELECT * FROM earnings_calendar WHERE event_date >= CURRENT_DATE ORDER BY event_date ASC LIMIT %s",
+        (limit,),
+    )
+
+
+def historical_earnings(limit: int = 20) -> list[dict]:
+    return _safe_fetch(
+        "SELECT * FROM earnings_calendar WHERE event_date < CURRENT_DATE AND eps_actual IS NOT NULL ORDER BY event_date DESC LIMIT %s",
+        (limit,),
+    )
+
+
 def load_watchlist() -> list[str]:
     rows = _safe_fetch("SELECT ticker FROM watchlist_tickers ORDER BY ticker")
     return [row["ticker"] for row in rows]
