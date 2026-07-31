@@ -238,6 +238,71 @@ def jobs_summary_text(jobs):
     return " · ".join(parts)
 
 
+def latest_news_digest():
+    rows = safe(
+        """
+        SELECT payload, created_at FROM publications
+        WHERE publication_type = 'news_digest'
+        ORDER BY created_at DESC LIMIT 1
+        """
+    )
+    if not rows:
+        return None
+    payload = rows[0]["payload"]
+    if isinstance(payload, str):
+        payload = _json.loads(payload)
+    return {
+        "digest": payload.get("digest", ""),
+        "ticker_count": payload.get("ticker_count", 0),
+        "article_count": payload.get("article_count", 0),
+        "created_at": rows[0]["created_at"],
+    }
+
+
+def news_last_run(scope: str | None = None) -> datetime | None:
+    """Most recent job creation time for the news queue, optionally
+    filtered by scope ('holdings' | 'market') stored in the job payload.
+    Same 'last attempted, not last succeeded' semantics as the macro
+    side's last_run_times()."""
+    if scope is None:
+        rows = safe(
+            """
+            SELECT MAX(created_at) AS ts FROM jobs
+            WHERE queue = 'news' AND job_type = 'news_digest'
+            """
+        )
+    else:
+        rows = safe(
+            """
+            SELECT MAX(created_at) AS ts FROM jobs
+            WHERE queue = 'news' AND job_type = 'news_ingestion'
+              AND payload->>'scope' = %s
+            """,
+            (scope,),
+        )
+    return rows[0]["ts"] if rows else None
+
+
+def stocks_state():
+    from lemp_news.adapters import (
+        load_watchlist,
+        recent_articles_for_watchlist,
+        recent_articles_market,
+    )
+
+    return {
+        "watchlist": load_watchlist(),
+        "holdings_articles": recent_articles_for_watchlist(),
+        "market_articles": recent_articles_market(),
+        "digest": latest_news_digest(),
+        "last_runs": {
+            "holdings_ingestion": news_last_run("holdings"),
+            "market_ingestion": news_last_run("market"),
+            "digest": news_last_run(None),
+        },
+    }
+
+
 def dashboard_state():
     jobs = safe("SELECT status, COUNT(*) AS count FROM jobs GROUP BY status ORDER BY status")
     jobs_active = any(

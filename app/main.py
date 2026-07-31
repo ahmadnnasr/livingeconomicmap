@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from app.auth import require_auth
 from app.db import connection
 from app.formatting import fmt_et, fmt_macro, fmt_pct
-from app.queries import concept_history, dashboard_state, macro_series_history, public_conditions, ran_today
+from app.queries import concept_history, dashboard_state, macro_series_history, public_conditions, ran_today, stocks_state
 from app.settings import get_settings
 
 
@@ -96,6 +96,138 @@ def dashboard(
             "skipped": request.query_params.get("skipped"),
         },
     )
+
+
+@app.get(
+    "/stocks",
+    response_class=HTMLResponse,
+)
+def stocks(
+    request: Request,
+    user=Depends(require_auth),
+):
+    return templates.TemplateResponse(
+        "stocks.html",
+        {
+            "request": request,
+            "state": stocks_state(),
+            "settings": get_settings(),
+            "user": user,
+            "skipped": request.query_params.get("skipped"),
+        },
+    )
+
+
+@app.post("/admin/watchlist/add")
+def watchlist_add(
+    ticker: str = Form(...),
+    user=Depends(require_auth),
+):
+    from lemp_news.adapters import add_ticker
+
+    add_ticker(ticker)
+    return RedirectResponse(url="/stocks", status_code=303)
+
+
+@app.post("/admin/watchlist/remove")
+def watchlist_remove(
+    ticker: str = Form(...),
+    user=Depends(require_auth),
+):
+    from lemp_news.adapters import remove_ticker
+
+    remove_ticker(ticker)
+    return RedirectResponse(url="/stocks", status_code=303)
+
+
+@app.post("/admin/run/news-ingestion")
+def run_news_ingestion(
+    scope: str = Form(...),
+    user=Depends(require_auth),
+):
+    """
+    Queue a news-ingestion job on the dedicated 'news' queue — kept
+    separate from FRED's 'ingestion' queue on purpose: a large,
+    unfiltered market-wide pull could otherwise block FRED jobs behind
+    it, the same failure mode already hit twice tonight with other jobs.
+    """
+    if scope not in ("holdings", "market"):
+        raise HTTPException(status_code=400, detail="scope must be 'holdings' or 'market'")
+
+    with connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT job_id
+            FROM jobs
+            WHERE queue = %s
+              AND job_type = %s
+              AND status IN ('queued', 'running')
+              AND payload->>'scope' = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            ("news", "news_ingestion", scope),
+        )
+        existing_job = cur.fetchone()
+        if existing_job is None:
+            cur.execute(
+                """
+                INSERT INTO jobs (
+                    queue, job_type, payload, status,
+                    priority, attempts, max_attempts, run_after
+                )
+                VALUES (%s, %s, %s::jsonb, 'queued', 100, 0, 5, NOW())
+                """,
+                ("news", "news_ingestion", json.dumps({"scope": scope})),
+            )
+            conn.commit()
+    return RedirectResponse(url="/stocks", status_code=303)
+
+
+@app.post("/admin/run/news-digest")
+def run_news_digest(
+    force: str | None = Form(default=None),
+    user=Depends(require_auth),
+):
+    """
+    Queue a holdings news-digest job — same same-day guard as
+    narrative/asset-analysis, same reason: a real, billed API call per
+    click.
+    """
+    from datetime import date as _date
+
+    if force != "true" and ran_today("news_digest"):
+        return RedirectResponse(url="/stocks?skipped=news-digest", status_code=303)
+
+    with connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT job_id
+            FROM jobs
+            WHERE queue = %s
+              AND job_type = %s
+              AND status IN ('queued', 'running')
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            ("news", "news_digest"),
+        )
+        existing_job = cur.fetchone()
+        if existing_job is None:
+            cur.execute(
+                """
+                INSERT INTO jobs (
+                    queue, job_type, payload, status,
+                    priority, attempts, max_attempts, run_after
+                )
+                VALUES (%s, %s, %s::jsonb, 'queued', 100, 0, 5, NOW())
+                """,
+                ("news", "news_digest", json.dumps({"as_of_date": _date.today().isoformat()})),
+            )
+            conn.commit()
+    return RedirectResponse(url="/stocks", status_code=303)
 
 
 @app.get("/api/macro/{series_id}/history")
