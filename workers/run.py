@@ -250,6 +250,22 @@ def process_publication_job(
             "publication_id": publication_id,
         }
 
+    if job_type == "asset_regime_analysis":
+        from lemp_daily.adapters import load_snapshot, persist_asset_analysis
+        from lemp_daily.asset_analysis import generate_asset_analysis
+
+        snapshot = load_snapshot()
+        result = generate_asset_analysis(
+            snapshot["macro"],
+            snapshot["beliefs"],
+            snapshot["regimes"],
+        )
+        publication_id = persist_asset_analysis(as_of_date, result)
+
+        return {
+            "publication_id": publication_id,
+        }
+
     raise NotImplementedError(
         f"No publication handler registered for job_type='{job_type}'."
     )
