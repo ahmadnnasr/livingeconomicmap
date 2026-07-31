@@ -118,6 +118,87 @@ def stocks(
     )
 
 
+@app.post("/admin/run/trending-tickers")
+def run_trending_tickers(
+    user=Depends(require_auth),
+):
+    with connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT job_id FROM jobs
+            WHERE queue = %s AND job_type = %s AND status IN ('queued', 'running')
+            ORDER BY created_at DESC LIMIT 1
+            """,
+            ("news", "trending_tickers"),
+        )
+        existing_job = cur.fetchone()
+        if existing_job is None:
+            cur.execute(
+                """
+                INSERT INTO jobs (queue, job_type, payload, status, priority, attempts, max_attempts, run_after)
+                VALUES (%s, %s, %s::jsonb, 'queued', 100, 0, 5, NOW())
+                """,
+                ("news", "trending_tickers", json.dumps({})),
+            )
+            conn.commit()
+    return RedirectResponse(url="/stocks", status_code=303)
+
+
+@app.post("/admin/run/ratings-discovery")
+def run_ratings_discovery(
+    user=Depends(require_auth),
+):
+    with connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT job_id FROM jobs
+            WHERE queue = %s AND job_type = %s AND status IN ('queued', 'running')
+            ORDER BY created_at DESC LIMIT 1
+            """,
+            ("news", "ratings_discovery"),
+        )
+        existing_job = cur.fetchone()
+        if existing_job is None:
+            cur.execute(
+                """
+                INSERT INTO jobs (queue, job_type, payload, status, priority, attempts, max_attempts, run_after)
+                VALUES (%s, %s, %s::jsonb, 'queued', 100, 0, 5, NOW())
+                """,
+                ("news", "ratings_discovery", json.dumps({})),
+            )
+            conn.commit()
+    return RedirectResponse(url="/stocks", status_code=303)
+
+
+@app.post("/admin/run/earnings-calendar")
+def run_earnings_calendar(
+    user=Depends(require_auth),
+):
+    with connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT job_id FROM jobs
+            WHERE queue = %s AND job_type = %s AND status IN ('queued', 'running')
+            ORDER BY created_at DESC LIMIT 1
+            """,
+            ("news", "earnings_calendar"),
+        )
+        existing_job = cur.fetchone()
+        if existing_job is None:
+            cur.execute(
+                """
+                INSERT INTO jobs (queue, job_type, payload, status, priority, attempts, max_attempts, run_after)
+                VALUES (%s, %s, %s::jsonb, 'queued', 100, 0, 5, NOW())
+                """,
+                ("news", "earnings_calendar", json.dumps({})),
+            )
+            conn.commit()
+    return RedirectResponse(url="/stocks", status_code=303)
+
+
 @app.post("/admin/watchlist/add")
 def watchlist_add(
     ticker: str = Form(...),

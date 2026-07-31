@@ -290,10 +290,23 @@ def stocks_state():
         recent_articles_market,
         recent_wiim_articles,
         latest_bars_summary,
+        latest_trending_snapshot,
+        latest_ratings_snapshot,
+        upcoming_earnings,
+        historical_earnings,
     )
 
     bars_rows = safe(
         "SELECT MAX(created_at) AS ts FROM jobs WHERE queue = 'bars' AND job_type = 'bars_ingestion'"
+    )
+    trending_rows = safe(
+        "SELECT MAX(created_at) AS ts FROM jobs WHERE queue = 'news' AND job_type = 'trending_tickers'"
+    )
+    ratings_rows = safe(
+        "SELECT MAX(created_at) AS ts FROM jobs WHERE queue = 'news' AND job_type = 'ratings_discovery'"
+    )
+    earnings_rows = safe(
+        "SELECT MAX(created_at) AS ts FROM jobs WHERE queue = 'news' AND job_type = 'earnings_calendar'"
     )
 
     return {
@@ -303,11 +316,18 @@ def stocks_state():
         "wiim_articles": recent_wiim_articles(),
         "digest": latest_news_digest(),
         "bars_summary": latest_bars_summary(),
+        "trending": latest_trending_snapshot(),
+        "ratings": latest_ratings_snapshot(),
+        "upcoming_earnings": upcoming_earnings(),
+        "historical_earnings": historical_earnings(),
         "last_runs": {
             "holdings_ingestion": news_last_run("holdings"),
             "market_ingestion": news_last_run("market"),
             "digest": news_last_run(None),
             "bars": bars_rows[0]["ts"] if bars_rows else None,
+            "trending": trending_rows[0]["ts"] if trending_rows else None,
+            "ratings": ratings_rows[0]["ts"] if ratings_rows else None,
+            "earnings": earnings_rows[0]["ts"] if earnings_rows else None,
         },
     }
 
