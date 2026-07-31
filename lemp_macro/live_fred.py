@@ -38,7 +38,7 @@ PRIORITY_SERIES: tuple[FredSeriesSpec, ...] = (
         "Higher values generally indicate more central-bank liquidity.",
     ),
     FredSeriesSpec(
-        "RESPPLLOPNWW",
+        "WRESBAL",
         "Reserve balances with Federal Reserve Banks",
         "Millions of dollars",
         "Weekly",
