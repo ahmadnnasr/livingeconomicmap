@@ -1,7 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ settings.app_name }}</title><link rel="stylesheet" href="/static/app.css"></head>
 <body><main><header><div><span class="eyebrow">LIVE RESEARCH OPERATING SYSTEM</span><h1>{{ settings.app_name }}</h1><p>Macro evidence → beliefs → regimes → rankings → publications</p></div><div class="badge">{{ settings.app_env }}</div></header>
 <section><article><div class="section-head"><div><h2>Official macro data</h2><p class="empty">Latest validated readings from FRED. <small class="last-run">Last run: {{ state.last_runs.ingestion|fmt_et }}</small></p></div><form method="post" action="/admin/ingest/fred"><button type="submit">Run FRED ingestion</button></form></div>{% for x in state.macro %}<div class="row macro-row chartable" onclick="openChart('{{ x.series_id }}')"><span><b>{{ x.title }}</b><small>{{ x.series_id }} · {{ x.observation_date }} · {{ x.category }}</small></span><strong>{{ x.value|fmt_macro(x.units) }}</strong></div>{% else %}<p class="empty">No macro observations yet. Run the first FRED ingestion.</p>{% endfor %}</article></section>
-<section class="grid"><article><div class="section-head"><div><h2>Beliefs</h2><small class="last-run">Last run: {{ state.last_runs.reasoning|fmt_et }}</small></div><form method="post" action="/admin/run/reasoning"><button type="submit">Run reasoning</button></form></div>{% for x in state.beliefs %}<div class="row"><span>{{ x.belief_key }}</span><b>{{ x.probability|fmt_pct }}</b></div>{% else %}<p class="empty">No belief snapshots yet.</p>{% endfor %}</article><article><h2>Regimes</h2>{% for x in state.regimes %}<div class="row"><span>{{ x.regime_key }}</span><b>{{ x.probability|fmt_pct }}</b></div>{% else %}<p class="empty">No regime snapshots yet.</p>{% endfor %}</article></section>
+<section class="grid"><article><div class="section-head"><div><h2>Beliefs</h2><small class="last-run">Last run: {{ state.last_runs.reasoning|fmt_et }}</small></div><form method="post" action="/admin/run/reasoning"><button type="submit">Run reasoning</button></form></div>{% for x in state.beliefs %}<div class="row chartable" onclick="openConcept('{{ x.belief_key }}', {{ x.probability }})"><span>{{ x.belief_key }}</span><b>{{ x.probability|fmt_pct }}</b></div>{% else %}<p class="empty">No belief snapshots yet.</p>{% endfor %}</article><article><h2>Regimes</h2>{% for x in state.regimes %}<div class="row chartable" onclick="openConcept('{{ x.regime_key }}', {{ x.probability }})"><span>{{ x.regime_key }}</span><b>{{ x.probability|fmt_pct }}</b></div>{% else %}<p class="empty">No regime snapshots yet.</p>{% endfor %}</article></section>
 <section><article><div class="section-head"><div><h2>Narrative</h2><p class="empty">AI-generated synthesis of current conditions. <small class="last-run">Last run: {{ state.last_runs.narrative|fmt_et }}</small></p></div><form method="post" action="/admin/run/narrative"><button type="submit">Run narrative</button></form></div>{% if state.narrative %}<p class="narrative-body">{{ state.narrative.narrative }}</p><dl class="glossary">{% for key, definition in state.narrative.glossary.items() %}<dt>{{ key.replace('_', ' ') }}</dt><dd>{{ definition }}</dd>{% endfor %}</dl>{% else %}<p class="empty">No narrative generated yet.</p>{% endif %}</article></section>
 <section><article><h2>Recent ingestion</h2>{% for x in state.ingestion_runs %}<div class="row macro-row"><span><b>{{ x.provider }} · {{ x.status }}</b><small>{{ (x.completed_at or x.started_at)|fmt_et }}</small></span><strong>{{ x.series_succeeded }}/{{ x.series_requested }}</strong></div>{% else %}<p class="empty">No ingestion runs recorded.</p>{% endfor %}</article></section>
 <section><article><div class="section-head"><h2>Recent publications</h2><form method="post" action="/admin/run/publication"><button type="submit">Run publication</button></form></div>{% for x in state.publications %}<div class="row"><span>{{ x.subject }}</span><b>{{ x.status }}</b></div>{% else %}<p class="empty">No publications generated yet.</p>{% endfor %}</article></section>
@@ -11,7 +11,7 @@
     <button class="modal-close" onclick="closeChart()" aria-label="Close">×</button>
     <h3 id="chart-title"></h3>
     <div id="chart-meta" class="chart-meta"></div>
-    <div id="chart-svg-container"></div>
+    <div id="modal-body"></div>
   </div>
 </div>
 <div id="job-toast" class="toast"></div>
@@ -103,7 +103,7 @@ function openChart(seriesId) {
   var overlay = document.getElementById('chart-modal');
   var titleEl = document.getElementById('chart-title');
   var metaEl = document.getElementById('chart-meta');
-  var container = document.getElementById('chart-svg-container');
+  var container = document.getElementById('modal-body');
   titleEl.textContent = 'Loading…';
   metaEl.textContent = '';
   container.innerHTML = '';
@@ -133,6 +133,193 @@ function openChart(seriesId) {
 
 function closeChart() {
   document.getElementById('chart-modal').className = 'modal-overlay';
+}
+
+var CONCEPTS = {
+  central_bank_liquidity: {
+    label: "Central-Bank Liquidity",
+    kind: "belief",
+    technical: "Computed from two Fed data series: the 4-week change in the Fed's total balance sheet (WALCL, 45% weight) and the 4-week change in bank reserve balances (WRESBAL, 30% weight). Both move this belief in the same direction \u2014 rising values push it up.",
+    measures: "Whether the Federal Reserve's own balance sheet and the reserves it supplies to the banking system are expanding or shrinking right now \u2014 in plain terms, whether the Fed itself is adding liquidity (QE-like behavior) or pulling it back (QT-like behavior).",
+    bands: [
+      { max: 0.35, text: "The Fed's balance sheet and bank reserves are shrinking. The Fed is actively draining liquidity from the financial system \u2014 historically associated with tighter financial conditions and more pressure on risk assets." },
+      { max: 0.65, text: "No strong signal either way \u2014 the Fed's balance sheet and reserves are roughly flat or sending mixed signals." },
+      { max: 1.01, text: "The Fed's balance sheet and bank reserves are expanding. Central-bank liquidity is flowing into the system \u2014 historically supportive of asset prices and looser borrowing conditions." }
+    ]
+  },
+  treasury_liquidity: {
+    label: "Treasury Liquidity",
+    kind: "belief",
+    technical: "Computed from the 4-week change in the Treasury General Account (WTREGEN, the U.S. Treasury's cash balance held at the Fed). A RISING TGA balance pushes this belief DOWN \u2014 the relationship is inverted, because building cash at the Fed pulls money out of the private banking system.",
+    measures: "Whether the Treasury's day-to-day cash management is adding money to, or draining money from, the private financial system \u2014 separate from the Fed's own actions.",
+    bands: [
+      { max: 0.35, text: "The Treasury is building up its cash balance (issuing debt faster than it's spending). That pulls cash out of the banking system and tightens private-market liquidity, even if the Fed itself isn't doing anything." },
+      { max: 0.65, text: "The Treasury's cash balance is roughly stable \u2014 not a meaningful liquidity drag or boost right now." },
+      { max: 1.01, text: "The Treasury is spending down its cash balance faster than it's issuing debt, injecting cash back into the banking system \u2014 a liquidity tailwind independent of the Fed." }
+    ]
+  },
+  money_market_liquidity: {
+    label: "Money-Market Liquidity",
+    kind: "belief",
+    technical: "Computed from the 4-week change in overnight reverse repo (RRP) usage \u2014 cash that money-market funds park overnight at the Fed instead of lending elsewhere. A RISING RRP balance pushes this belief DOWN, since money sitting in the Fed's facility isn't circulating.",
+    measures: "Whether cash is flowing out of the Fed's overnight parking facility into active use elsewhere (bank deposits, short-term lending, T-bills), or piling up there instead.",
+    bands: [
+      { max: 0.35, text: "Reverse-repo balances are rising \u2014 more cash is being parked idle at the Fed rather than circulating through the private financial system." },
+      { max: 0.65, text: "RRP balances are roughly stable \u2014 no strong pull in either direction." },
+      { max: 1.01, text: "Reverse-repo balances are falling \u2014 cash is leaving the Fed's overnight facility and becoming available for banks and money markets to actually use." }
+    ]
+  },
+  policy_restrictiveness: {
+    label: "Policy Restrictiveness",
+    kind: "belief",
+    technical: "Computed directly from the level of the effective federal funds rate (DFF) \u2014 the Fed's actual policy rate \u2014 scaled against a 5% reference point. This is the only belief based on a raw level rather than a recent change.",
+    measures: "How expensive short-term borrowing is right now, in absolute terms, because of where the Fed has set its policy rate.",
+    bands: [
+      { max: 0.35, text: "The policy rate is low relative to the model's reference point \u2014 borrowing is cheap, monetary policy is accommodative." },
+      { max: 0.65, text: "The policy rate is in a middle range \u2014 neither clearly restrictive nor clearly loose." },
+      { max: 1.01, text: "The policy rate is elevated \u2014 the Fed is actively making borrowing expensive to slow the economy or fight inflation." }
+    ]
+  },
+  front_end_restrictiveness: {
+    label: "Front-End Restrictiveness",
+    kind: "belief",
+    technical: "Computed from the 2-year Treasury yield's z-score \u2014 how far today's 2yr yield sits from its own recent statistical range, not its absolute level. The 2yr yield is the market's best real-time guess at where Fed policy is headed over roughly the next two years.",
+    measures: "Whether the bond market is currently pricing in a tighter or looser near-term rate path than it has recently \u2014 a market-based read on Fed expectations, distinct from what the Fed has actually done.",
+    bands: [
+      { max: 0.35, text: "The 2-year yield is unusually low versus its recent range \u2014 markets are leaning toward pricing in rate cuts or an easier near-term path." },
+      { max: 0.65, text: "The 2-year yield is within its normal recent range \u2014 no strong repricing of near-term Fed expectations." },
+      { max: 1.01, text: "The 2-year yield is unusually high versus its recent range \u2014 markets are leaning hawkish, pricing a tighter near-term path than usual." }
+    ]
+  },
+  long_rate_pressure: {
+    label: "Long-Rate Pressure",
+    kind: "belief",
+    technical: "Computed from the 10-year Treasury yield's z-score \u2014 how stretched today's 10yr yield is versus its own recent range. Reflects longer-run growth, inflation, and term-premium expectations rather than near-term Fed policy.",
+    measures: "Whether long-term borrowing costs are unusually elevated or subdued right now, which matters most for anything valued on long-horizon cash flows.",
+    bands: [
+      { max: 0.35, text: "The 10-year yield is unusually low versus its recent range \u2014 little pressure on long-duration assets like growth stocks or long bonds." },
+      { max: 0.65, text: "The 10-year yield is within its normal recent range." },
+      { max: 1.01, text: "The 10-year yield is unusually high versus its recent range \u2014 this pressures valuations of anything priced on long-run discounted cash flows, and signals markets pricing higher sustained rates, inflation, or term premium." }
+    ]
+  },
+  real_yield_pressure: {
+    label: "Real-Yield Pressure",
+    kind: "belief",
+    technical: "Computed from the 10-year TIPS (inflation-protected) yield's z-score \u2014 the true, inflation-adjusted cost of long-term capital. This is the single heaviest-weighted input in the entire model (35% of the rate-side blend, and the individual series carries the highest weight of any evidence rule). It also has a hard-coded override: when this reading is 65% or higher, the model explicitly caps how much support \"easy liquidity\" can lend to growth-asset valuations, regardless of what every other belief says.",
+    measures: "The real (after-inflation) cost of long-term money \u2014 widely considered the most important single price in markets, since it's what actually discounts every long-duration cash flow.",
+    bands: [
+      { max: 0.35, text: "Real yields are unusually low versus their recent range \u2014 long-term capital is cheap in inflation-adjusted terms, a tailwind for richly-valued, long-duration assets." },
+      { max: 0.65, text: "Real yields are within their normal recent range \u2014 no unusual pressure from this channel." },
+      { max: 1.01, text: "Real yields are unusually high versus their recent range. This is the model's dominant warning signal: at this level it directly overrides liquidity-driven optimism and caps support for growth-asset valuations \u2014 \u201cliquidity is loose\u201d stops mattering as much when real money is genuinely expensive." }
+    ]
+  },
+  composite_liquidity: {
+    label: "Composite Liquidity",
+    kind: "belief",
+    technical: "A weighted blend of three beliefs: 40% central-bank liquidity, 30% Treasury liquidity, 30% money-market liquidity. This is the model's single headline liquidity number.",
+    measures: "Overall liquidity direction across all three plumbing channels \u2014 the Fed, the Treasury, and money markets \u2014 combined into one number.",
+    bands: [
+      { max: 0.35, text: "Liquidity is broadly contracting across the Fed, Treasury, and money-market channels together \u2014 a genuinely tight backdrop, not just one channel." },
+      { max: 0.65, text: "The three liquidity channels are offsetting each other, or all sitting near neutral \u2014 no single clear liquidity narrative applies right now." },
+      { max: 1.01, text: "Liquidity is broadly expanding across the Fed, Treasury, and money-market channels together \u2014 a genuinely loose backdrop, not just one channel." }
+    ]
+  },
+  QE: {
+    label: "QE-Like Regime",
+    kind: "regime",
+    technical: "Scored as composite_liquidity \u00d7 central_bank_liquidity \u2014 highest when overall liquidity AND the Fed's own balance sheet/reserves are both elevated together, so the Fed specifically looks like the driver.",
+    measures: "How closely current conditions resemble a Fed quantitative-easing environment \u2014 not an announcement, just a directional read on the data.",
+    bands: [
+      { max: 0.20, text: "Conditions don't currently resemble a QE-like environment." },
+      { max: 1.01, text: "Conditions currently resemble a QE-like environment \u2014 historically associated with easier financial conditions and support for risk assets and lower long-term yields." }
+    ]
+  },
+  QT: {
+    label: "QT-Like Regime",
+    kind: "regime",
+    technical: "Scored as (1 \u2212 composite_liquidity) \u00d7 (1 \u2212 central_bank_liquidity) \u2014 highest when overall liquidity AND the Fed's own balance sheet/reserves are both contracting together.",
+    measures: "How closely current conditions resemble active Fed balance-sheet reduction (quantitative tightening).",
+    bands: [
+      { max: 0.20, text: "Conditions don't currently resemble a QT-like environment." },
+      { max: 1.01, text: "Conditions currently resemble a QT-like environment \u2014 historically associated with tighter financial conditions, more volatility, and pressure on risk assets." }
+    ]
+  },
+  mixed_liquidity: {
+    label: "Mixed Liquidity",
+    kind: "regime",
+    technical: "Scored as 1 \u2212 |composite_liquidity \u2212 0.5| \u00d7 2 \u2014 this score peaks exactly when composite liquidity sits at a neutral 50%, and falls the further composite liquidity leans clearly loose or clearly tight.",
+    measures: "How ambiguous the overall liquidity picture currently is \u2014 not a direction, but a confidence-in-direction reading.",
+    bands: [
+      { max: 0.20, text: "The liquidity picture is currently fairly clear-cut in one direction \u2014 low ambiguity." },
+      { max: 1.01, text: "The liquidity channels are currently offsetting each other or sitting near neutral \u2014 no strong \u201cloose\u201d or \u201ctight\u201d narrative should be drawn from liquidity alone right now." }
+    ]
+  },
+  treasury_stress: {
+    label: "Treasury Stress",
+    kind: "regime",
+    technical: "Scored as (1 \u2212 treasury_liquidity) \u00d7 long_rate_pressure \u2014 highest when the Treasury's cash operations are draining liquidity AT THE SAME TIME the 10-year yield is unusually stretched.",
+    measures: "Whether Treasury cash-management dynamics and long-end yield pressure are compounding each other \u2014 a combination associated with strained Treasury-market functioning.",
+    bands: [
+      { max: 0.20, text: "Little sign of compounding Treasury-market and long-yield pressure right now." },
+      { max: 1.01, text: "Treasury cash drainage and elevated long-term yields are compounding \u2014 historically the kind of setup associated with choppier bond auctions, rising term premium, and spillover pressure into other rate-sensitive assets." }
+    ]
+  },
+  money_market_stress: {
+    label: "Money-Market Stress",
+    kind: "regime",
+    technical: "Scored as (1 \u2212 money_market_liquidity) \u00d7 a secured-funding-stress factor \u2014 intended to combine reverse-repo drainage with elevated short-term secured funding rates (SOFR running hot relative to the policy rate).",
+    measures: "The classic repo/funding-stress signature \u2014 cash leaving the Fed's overnight facility while short-term borrowing between banks and dealers gets unusually expensive, similar to the September 2019 repo-market episode.",
+    bands: [
+      { max: 0.20, text: "Little sign of money-market funding stress right now." },
+      { max: 1.01, text: "Conditions are showing signs consistent with money-market funding stress \u2014 worth watching short-term funding markets closely." }
+    ]
+  },
+  real_rate_tightening: {
+    label: "Real-Rate Tightening Regime",
+    kind: "regime",
+    technical: "Scored directly from the real_yield_pressure belief, renormalized against the other regime scores \u2014 this regime is essentially asking \u201cis expensive real money the dominant force right now?\u201d",
+    measures: "Whether high inflation-adjusted borrowing costs are the primary story in current conditions, independent of what nominal liquidity is doing.",
+    bands: [
+      { max: 0.20, text: "Real-rate tightening isn't the dominant force in current conditions." },
+      { max: 1.01, text: "Expensive real (inflation-adjusted) money is currently the dominant force \u2014 this tends to weigh on richly-valued, long-duration assets regardless of how loose nominal liquidity looks." }
+    ]
+  }
+};
+
+function pickBand(bands, prob) {
+  for (var i = 0; i < bands.length; i++) {
+    if (prob <= bands[i].max) return bands[i].text;
+  }
+  return bands[bands.length - 1].text;
+}
+
+function openConcept(key, prob) {
+  var overlay = document.getElementById('chart-modal');
+  var titleEl = document.getElementById('chart-title');
+  var metaEl = document.getElementById('chart-meta');
+  var container = document.getElementById('modal-body');
+  var concept = CONCEPTS[key];
+
+  overlay.className = 'modal-overlay modal-show';
+
+  if (!concept) {
+    titleEl.textContent = key;
+    metaEl.textContent = '';
+    container.innerHTML = '<p class="empty">No explanation written for this one yet.</p>';
+    return;
+  }
+
+  titleEl.textContent = concept.label;
+  metaEl.textContent = (concept.kind === 'belief' ? 'Belief' : 'Regime') + ' · currently ' + (prob * 100).toFixed(1) + '%';
+
+  var html = '';
+  html += '<p class="concept-section-label">What it\u2019s measuring</p>';
+  html += '<p class="concept-body">' + concept.measures + '</p>';
+  html += '<p class="concept-section-label">How it\u2019s actually computed</p>';
+  html += '<p class="concept-body">' + concept.technical + '</p>';
+  html += '<p class="concept-section-label">What ' + (prob * 100).toFixed(1) + '% means right now</p>';
+  html += '<p class="concept-body concept-current">' + pickBand(concept.bands, prob) + '</p>';
+  container.innerHTML = html;
 }
 
 document.addEventListener('keydown', function (e) {
