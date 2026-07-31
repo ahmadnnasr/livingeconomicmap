@@ -93,13 +93,13 @@ def generate_narrative(
             },
             json={
                 "model": MODEL,
-                "max_tokens": 1500,
+                "max_tokens": 4096,
                 "messages": [
                     {"role": "user", "content": prompt},
                 ],
             },
             timeout=httpx.Timeout(
-                connect=15.0, read=60.0, write=30.0, pool=15.0
+                connect=15.0, read=120.0, write=30.0, pool=15.0
             ),
         )
     except httpx.HTTPError as exc:
@@ -114,6 +114,14 @@ def generate_narrative(
         )
 
     data = response.json()
+
+    if data.get("stop_reason") == "max_tokens":
+        raise NarrativeGenerationError(
+            "Response was cut off at the max_tokens limit before finishing "
+            "the JSON — the model needed more room than 4096 tokens allowed. "
+            "Raise max_tokens further or shorten the requested glossary."
+        )
+
     text_blocks = [
         block["text"]
         for block in data.get("content", [])
