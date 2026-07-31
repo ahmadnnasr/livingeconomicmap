@@ -107,7 +107,7 @@ def generate_asset_analysis(
             },
             json={
                 "model": MODEL,
-                "max_tokens": 4096,
+                "max_tokens": 8000,
                 "messages": [
                     {"role": "user", "content": prompt},
                 ],
@@ -116,7 +116,7 @@ def generate_asset_analysis(
                 ],
             },
             timeout=httpx.Timeout(
-                connect=15.0, read=180.0, write=30.0, pool=15.0
+                connect=15.0, read=240.0, write=30.0, pool=15.0
             ),
         )
     except httpx.HTTPError as exc:
@@ -135,7 +135,7 @@ def generate_asset_analysis(
     if data.get("stop_reason") == "max_tokens":
         raise AssetAnalysisError(
             "Response was cut off at the max_tokens limit before finishing "
-            "the JSON — the model needed more room than 4096 tokens allowed."
+            "the JSON — the model needed more room than 8000 tokens allowed."
         )
 
     text_blocks = [
