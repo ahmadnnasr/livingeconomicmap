@@ -1,13 +1,43 @@
+import json as _json
+
 from app.db import fetch_all
- 
- 
+
+
 def safe(query, params=()):
     try:
         return fetch_all(query, params)
     except Exception:
         return []
- 
- 
+
+
+def latest_narrative():
+    """
+    Returns the most recent narrative_synthesis publication as a plain
+    dict with `narrative` (str) and `glossary` (dict) pulled out of the
+    JSONB payload, or None if none exists yet. Normalizes payload whether
+    psycopg hands it back as a dict (typical) or a raw string.
+    """
+    rows = safe(
+        """
+        SELECT payload, created_at FROM publications
+        WHERE publication_type = 'narrative_synthesis'
+        ORDER BY created_at DESC LIMIT 1
+        """
+    )
+    if not rows:
+        return None
+
+    payload = rows[0]["payload"]
+    if isinstance(payload, str):
+        payload = _json.loads(payload)
+
+    return {
+        "narrative": payload.get("narrative", ""),
+        "glossary": payload.get("glossary", {}),
+        "created_at": rows[0]["created_at"],
+    }
+
+
 def public_conditions():
     """
     Curated, read-only subset of dashboard_state() safe to expose outside
@@ -43,10 +73,11 @@ def public_conditions():
             """
         ),
     }
- 
- 
+
+
 def dashboard_state():
     return {
+        "narrative": latest_narrative(),
         "beliefs": safe(
             """
             SELECT belief_key, probability, confidence, updated_at FROM (
@@ -85,4 +116,3 @@ def dashboard_state():
             """
         ),
     }
- 

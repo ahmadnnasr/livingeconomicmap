@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     eia_api_key: str | None = None
     benzinga_api_key: str | None = None
     public_conditions_key: str | None = None
+    anthropic_api_key: str | None = None
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 @lru_cache
