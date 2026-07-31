@@ -1,13 +1,17 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ settings.app_name }} · Stocks</title><link rel="stylesheet" href="/static/app.css"></head>
 <body><main><header><div><span class="eyebrow">LIVE RESEARCH OPERATING SYSTEM</span><h1>Stocks</h1><p>Corporate news, holdings digest, and general market feed — powered by Benzinga.</p></div><nav class="page-nav"><a href="/">Macro</a><a href="/stocks" class="active">Stocks</a></nav><div class="badge">{{ settings.app_env }}</div></header>
 
-<div class="view-toggle"><button id="tab-holdings" class="view-toggle-btn active" onclick="showView('holdings')">My Holdings</button><button id="tab-market" class="view-toggle-btn" onclick="showView('market')">General Market</button></div>
+<div class="view-toggle"><button id="tab-holdings" class="view-toggle-btn active" onclick="showView('holdings')">My Holdings</button><button id="tab-market" class="view-toggle-btn" onclick="showView('market')">General Market</button><button id="tab-wiim" class="view-toggle-btn" onclick="showView('wiim')">Why Is It Moving</button></div>
 
 <div id="view-holdings">
 
 <section><article><h2>Watchlist</h2>
 <div class="watchlist-chips">{% for t in state.watchlist %}<span class="chip">{{ t }}<form method="post" action="/admin/watchlist/remove" class="chip-remove-form"><input type="hidden" name="ticker" value="{{ t }}"><button type="submit" aria-label="Remove {{ t }}">×</button></form></span>{% else %}<p class="empty">No tickers yet — add one below.</p>{% endfor %}</div>
 <form method="post" action="/admin/watchlist/add" class="add-ticker-form"><input type="text" name="ticker" placeholder="e.g. NVDA" maxlength="10" required><button type="submit">Add</button></form>
+</article></section>
+
+<section><article><div class="section-head"><div><h2>Price Bars</h2><p class="empty">Daily OHLCV, ~3yr history, for your watchlist. <small class="last-run">Last run: {{ state.last_runs.bars|fmt_et }}</small></p></div><form method="post" action="/admin/run/bars-ingestion"><button type="submit">Run bars ingestion</button></form></div>
+{% for b in state.bars_summary %}<div class="row"><span>{{ b.ticker }} <small class="teaser">{{ b.bar_count }} bars · {{ b.earliest_date }} – {{ b.latest_date }}</small></span><b>{{ '%.2f'|format(b.latest_close) if b.latest_close else '—' }}</b></div>{% else %}<p class="empty">No price bars yet — run ingestion.</p>{% endfor %}
 </article></section>
 
 <section><article><div class="section-head"><div><h2>Holdings news feed</h2><p class="empty">Raw Benzinga headlines for your watchlist. <small class="last-run">Last run: {{ state.last_runs.holdings_ingestion|fmt_et }}</small></p></div><form method="post" action="/admin/run/news-ingestion"><input type="hidden" name="scope" value="holdings"><button type="submit">Run news ingestion</button></form></div>
@@ -28,14 +32,24 @@
 
 </div>
 
+<div id="view-wiim" style="display:none">
+
+<section><article><h2>Why Is It Moving</h2><p class="empty">Filtered from news you've already pulled — no separate ingestion needed. Run news ingestion (either scope) to refresh.</p>
+{% for a in state.wiim_articles %}<div class="row news-row"><span><b><a href="{{ a.url }}" target="_blank" rel="noopener">{{ a.title }}</a></b><small>{{ a.tickers|join(', ') }} · {{ a.published_at|fmt_et }}{% if a.author %} · {{ a.author }}{% endif %}</small>{% if a.teaser %}<small class="teaser">{{ a.teaser }}</small>{% endif %}</span></div>{% else %}<p class="empty">No WIIM-tagged articles yet.</p>{% endfor %}
+</article></section>
+
+</div>
+
 </main>
 <div id="job-toast" class="toast"></div>
 <script>
 function showView(view) {
   document.getElementById('view-holdings').style.display = view === 'holdings' ? '' : 'none';
   document.getElementById('view-market').style.display = view === 'market' ? '' : 'none';
+  document.getElementById('view-wiim').style.display = view === 'wiim' ? '' : 'none';
   document.getElementById('tab-holdings').className = 'view-toggle-btn' + (view === 'holdings' ? ' active' : '');
   document.getElementById('tab-market').className = 'view-toggle-btn' + (view === 'market' ? ' active' : '');
+  document.getElementById('tab-wiim').className = 'view-toggle-btn' + (view === 'wiim' ? ' active' : '');
 }
 
 (function(){
