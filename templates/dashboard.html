@@ -185,6 +185,203 @@ function attachHoverHandlers(obs, units) {
   capture.addEventListener('touchend', hide);
 }
 
+var MACRO_CONCEPTS = {
+  BAMLH0A0HYM2: {
+    description: "The extra yield investors demand to hold high-yield (\u201cjunk\u201d) corporate bonds over safe Treasuries \u2014 the market's real-time price on corporate default and recession risk.",
+    levelBands: [
+      { max: 3.0, text: "Spreads are historically tight \u2014 credit markets are pricing very little default or recession risk, sometimes a sign of complacent risk appetite." },
+      { max: 5.0, text: "Spreads are in a fairly normal historical range \u2014 credit markets see moderate, unremarkable risk." },
+      { max: 99, text: "Spreads are historically wide \u2014 credit markets are pricing meaningfully elevated default or recession risk, often alongside broader risk-asset stress." }
+    ],
+    trend: {
+      up: "Widening spreads mean credit investors are demanding more compensation for risk \u2014 often an early warning sign that shows up in credit before it's visible elsewhere.",
+      down: "Narrowing spreads mean credit investors are demanding less compensation for risk \u2014 a sign of calming or already-calm risk appetite.",
+      flat: "Spreads have been fairly stable recently \u2014 no meaningful shift in how credit markets are pricing risk."
+    }
+  },
+  DFF: {
+    description: "The Fed's actual current policy rate \u2014 what banks charge each other overnight, and the base rate that ripples through nearly all other borrowing costs.",
+    levelBands: [
+      { max: 2.0, text: "Policy is historically easy \u2014 the Fed's benchmark rate is low, making borrowing cheap." },
+      { max: 4.5, text: "Policy is in a moderate range \u2014 neither clearly easy nor clearly restrictive." },
+      { max: 99, text: "Policy is historically restrictive \u2014 the Fed's benchmark rate is elevated, making borrowing expensive on purpose." }
+    ],
+    trend: {
+      up: "A rising fed funds rate means the Fed has been actively hiking \u2014 tightening policy, usually to slow growth or fight inflation.",
+      down: "A falling fed funds rate means the Fed has been actively cutting \u2014 easing policy, usually in response to slowing growth or falling inflation.",
+      flat: "The Fed has been holding rates steady over this period \u2014 neither actively tightening nor easing right now."
+    }
+  },
+  DFII10: {
+    description: "The 10-year Treasury yield adjusted for expected inflation \u2014 the true, inflation-adjusted cost of long-term capital, and one of the most important single prices in markets.",
+    levelBands: [
+      { max: 0.5, text: "Real yields are historically low \u2014 long-term capital is cheap after inflation, a tailwind for richly-valued, long-duration assets." },
+      { max: 2.0, text: "Real yields are in a fairly normal historical range." },
+      { max: 99, text: "Real yields are historically elevated \u2014 a heavier discount on future cash flows, a headwind especially for long-duration and high-multiple assets." }
+    ],
+    trend: {
+      up: "Rising real yields mean the true cost of long-term capital is increasing \u2014 typically pressures valuations for growth stocks and other long-duration assets first.",
+      down: "Falling real yields mean the true cost of long-term capital is easing \u2014 typically a tailwind for long-duration, high-multiple assets.",
+      flat: "Real yields have been fairly stable recently \u2014 no strong new pressure or relief from this channel."
+    }
+  },
+  DGS10: {
+    description: "The nominal 10-year Treasury yield \u2014 the benchmark rate underlying mortgages, corporate borrowing, and most equity discount-rate models.",
+    levelBands: [
+      { max: 3.5, text: "The 10-year is historically low \u2014 cheaper long-term borrowing, less discount-rate pressure on valuations." },
+      { max: 4.75, text: "The 10-year is in a fairly normal recent historical range." },
+      { max: 99, text: "The 10-year is historically elevated \u2014 more expensive long-term borrowing and more pressure on anything valued on far-future cash flows." }
+    ],
+    trend: {
+      up: "A rising 10-year yield means long-term borrowing costs are increasing \u2014 pressures mortgage rates, corporate financing costs, and long-duration valuations.",
+      down: "A falling 10-year yield means long-term borrowing costs are easing \u2014 typically supportive of mortgage demand and long-duration valuations.",
+      flat: "The 10-year yield has been fairly range-bound recently."
+    }
+  },
+  DGS2: {
+    description: "The 2-year Treasury yield \u2014 mostly reflects where markets expect the Fed to set short-term rates over roughly the next two years, more than where rates sit today.",
+    levelBands: [
+      { max: 3.0, text: "The 2-year is historically low \u2014 markets are pricing meaningful Fed easing over the next couple of years." },
+      { max: 4.75, text: "The 2-year is in a fairly normal recent historical range." },
+      { max: 99, text: "The 2-year is historically elevated \u2014 markets expect the Fed to stay restrictive for longer than usual." }
+    ],
+    trend: {
+      up: "A rising 2-year yield means markets are pricing a more hawkish near-term Fed path than before \u2014 fewer or later expected rate cuts.",
+      down: "A falling 2-year yield means markets are pricing a more dovish near-term Fed path than before \u2014 more or sooner expected rate cuts.",
+      flat: "Near-term Fed-path expectations have been fairly stable recently."
+    }
+  },
+  NFCI: {
+    description: "The Chicago Fed's index of overall financial conditions, built to average zero over time \u2014 so the reading itself is a measure of looser- or tighter-than-average conditions, not an absolute level.",
+    levelBands: [
+      { max: -0.3, text: "Financial conditions are looser than their long-run average \u2014 credit is flowing easily, historically a supportive backdrop for risk assets." },
+      { max: 0.3, text: "Financial conditions are close to their long-run average \u2014 neither notably loose nor tight." },
+      { max: 99, text: "Financial conditions are tighter than their long-run average \u2014 credit and funding are harder to come by than usual." }
+    ],
+    trend: {
+      up: "A rising NFCI means financial conditions are tightening \u2014 credit is getting harder to access relative to recent history.",
+      down: "A falling NFCI means financial conditions are loosening \u2014 credit is getting easier to access relative to recent history.",
+      flat: "Financial conditions have been fairly stable relative to their own recent history."
+    }
+  },
+  RRPONTSYD: {
+    description: "Cash that money-market funds and banks park overnight at the Fed's reverse-repo facility in exchange for Treasury collateral, instead of lending it elsewhere.",
+    levelBands: [
+      { max: 200, text: "The facility is mostly drained \u2014 little cash is sitting idle here; it's active elsewhere in the financial system." },
+      { max: 1000, text: "A moderate amount of cash is parked here \u2014 within a fairly normal recent range." },
+      { max: 99999, text: "A large amount of cash is parked here \u2014 a sign of abundant idle short-term cash or a more risk-off short-term posture." }
+    ],
+    trend: {
+      up: "Rising RRP balances mean more cash is retreating into the Fed's overnight facility rather than circulating \u2014 often a sign of abundant but idle short-term cash.",
+      down: "Falling RRP balances mean cash is leaving the facility and becoming available for banks and money markets to actually use \u2014 a liquidity release.",
+      flat: "RRP usage has been fairly stable recently \u2014 no strong flow into or out of the facility."
+    }
+  },
+  SOFR: {
+    description: "The secured overnight financing rate \u2014 what banks and dealers actually pay to borrow cash overnight against Treasury collateral. Normally tracks close to the Fed's own policy rate.",
+    levelBands: [
+      { max: 2.0, text: "Overnight funding costs are historically low." },
+      { max: 4.5, text: "Overnight funding costs are in a fairly normal recent range." },
+      { max: 99, text: "Overnight funding costs are historically elevated." }
+    ],
+    trend: {
+      up: "Rising SOFR means overnight borrowing is getting more expensive \u2014 worth watching if it starts drifting away from the Fed's policy rate, a classic early sign of funding-market strain.",
+      down: "Falling SOFR means overnight borrowing is getting cheaper.",
+      flat: "Overnight funding costs have been fairly stable recently."
+    }
+  },
+  T10Y2Y: {
+    description: "The 10-year Treasury yield minus the 2-year \u2014 the shape of the yield curve. A negative reading (inversion) has historically preceded most U.S. recessions, though usually with a long and variable lag.",
+    levelBands: [
+      { max: 0, text: "The curve is inverted \u2014 short-term yields exceed long-term yields, a pattern that has preceded most U.S. recessions historically, though the timing lag has varied widely." },
+      { max: 0.5, text: "The curve is modestly positive \u2014 a normal shape, though on the flatter side." },
+      { max: 99, text: "The curve is healthily steep \u2014 a more typical, historically normal shape." }
+    ],
+    trend: {
+      up: "A steepening curve (rising T10Y2Y) often reflects easing recession fears, expected Fed cuts, or rising long-term growth/inflation expectations, depending on which end is moving.",
+      down: "A flattening or inverting curve (falling T10Y2Y) has historically been read as a warning sign of tightening financial conditions or rising recession risk.",
+      flat: "The curve's shape has been fairly stable recently."
+    }
+  },
+  WALCL: {
+    description: "The Federal Reserve's total balance sheet \u2014 all the assets (mostly Treasuries and mortgage bonds) the Fed holds. Its absolute size reflects over a decade of structural growth, so the trend matters far more here than the level itself.",
+    trend: {
+      up: "A growing balance sheet means the Fed is adding liquidity to the financial system (QE-like behavior) \u2014 historically supportive of asset prices and looser financial conditions.",
+      down: "A shrinking balance sheet means the Fed is actively withdrawing liquidity (QT-like behavior) \u2014 historically associated with tighter financial conditions.",
+      flat: "The balance sheet has been fairly stable recently \u2014 neither actively expanding nor contracting."
+    }
+  },
+  WRESBAL: {
+    description: "Reserve balances that banks hold at the Fed \u2014 the actual liquidity cushion in the banking system. Like the balance sheet itself, the trend matters more than the absolute dollar level.",
+    trend: {
+      up: "Rising reserves mean the banking system has more of a liquidity cushion \u2014 generally supportive of smooth short-term funding markets.",
+      down: "Falling reserves mean that cushion is shrinking \u2014 usually fine until reserves get scarce enough to strain short-term funding markets, which is worth watching if the decline continues.",
+      flat: "Bank reserves have been fairly stable recently."
+    }
+  },
+  WTREGEN: {
+    description: "The Treasury General Account \u2014 the U.S. government's own checking account at the Fed. Its balance moves with debt issuance and government spending, separate from anything the Fed itself is doing.",
+    trend: {
+      up: "A rising TGA balance means the Treasury is building up cash (often after heavy bond issuance) \u2014 pulling cash out of the private banking system as it does, even if the Fed isn't acting at all.",
+      down: "A falling TGA balance means the Treasury is spending down its cash \u2014 releasing money back into the private banking system, a liquidity tailwind independent of the Fed.",
+      flat: "The Treasury's cash balance has been fairly stable recently."
+    }
+  }
+};
+
+function classifyTrend(obs) {
+  if (obs.length < 2) return 'flat';
+  var latest = obs[obs.length - 1];
+  var latestDate = new Date(latest.date + 'T00:00:00');
+  var targetTime = latestDate.getTime() - 90 * 24 * 60 * 60 * 1000;
+
+  var refObs = obs[0];
+  for (var i = 0; i < obs.length; i++) {
+    var t = new Date(obs[i].date + 'T00:00:00').getTime();
+    if (t <= targetTime) { refObs = obs[i]; } else { break; }
+  }
+
+  var values = obs.map(function (o) { return o.value; });
+  var mean = values.reduce(function (a, b) { return a + b; }, 0) / values.length;
+  var variance = values.reduce(function (a, b) { return a + Math.pow(b - mean, 2); }, 0) / values.length;
+  var stdev = Math.sqrt(variance);
+
+  var delta = latest.value - refObs.value;
+  if (stdev === 0) return 'flat';
+  var z = delta / stdev;
+  if (z > 0.4) return 'up';
+  if (z < -0.4) return 'down';
+  return 'flat';
+}
+
+function buildContextHTML(seriesId, obs, apiInterpretation) {
+  var concept = MACRO_CONCEPTS[seriesId];
+  var description = (concept && concept.description) || apiInterpretation || 'No description available for this series yet.';
+
+  var html = '<p class="concept-section-label">What this measures</p>';
+  html += '<p class="concept-body">' + description + '</p>';
+
+  if (concept && concept.levelBands && obs.length) {
+    var latestValue = obs[obs.length - 1].value;
+    var levelText = concept.levelBands[concept.levelBands.length - 1].text;
+    for (var i = 0; i < concept.levelBands.length; i++) {
+      if (latestValue <= concept.levelBands[i].max) { levelText = concept.levelBands[i].text; break; }
+    }
+    html += '<p class="concept-section-label">Where we are right now</p>';
+    html += '<p class="concept-body concept-current">' + levelText + '</p>';
+  }
+
+  if (concept && concept.trend && obs.length >= 2) {
+    var direction = classifyTrend(obs);
+    var trendText = concept.trend[direction];
+    var trendLabel = direction === 'up' ? 'Trending up (last ~90 days)' : direction === 'down' ? 'Trending down (last ~90 days)' : 'Roughly flat (last ~90 days)';
+    html += '<p class="concept-section-label">' + trendLabel + '</p>';
+    html += '<p class="concept-body">' + trendText + '</p>';
+  }
+
+  return html;
+}
+
 function openChart(seriesId) {
   var overlay = document.getElementById('chart-modal');
   var titleEl = document.getElementById('chart-title');
@@ -209,7 +406,9 @@ function openChart(seriesId) {
       }
       var latest = obs[obs.length - 1];
       metaEl.textContent = obs.length + ' observations · ' + fmtChartDate(obs[0].date) + ' – ' + fmtChartDate(latest.date) + ' · latest: ' + fmtChartValue(latest.value, data.units);
-      container.innerHTML = buildChartSVG(obs, data.units);
+      var chartHTML = buildChartSVG(obs, data.units);
+      var contextHTML = buildContextHTML(seriesId, obs, data.interpretation);
+      container.innerHTML = chartHTML + '<div class="chart-context">' + contextHTML + '</div>';
       attachHoverHandlers(obs, data.units);
     })
     .catch(function (err) {
