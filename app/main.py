@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from app.auth import require_auth
 from app.db import connection
 from app.formatting import fmt_et, fmt_macro, fmt_pct
-from app.queries import dashboard_state, public_conditions
+from app.queries import dashboard_state, macro_series_history, public_conditions
 from app.settings import get_settings
 
 
@@ -95,6 +95,17 @@ def dashboard(
             "user": user,
         },
     )
+
+
+@app.get("/api/macro/{series_id}/history")
+def macro_history(
+    series_id: str,
+    user=Depends(require_auth),
+):
+    """Full history for one series, for the click-to-chart feature on the
+    dashboard. Same auth as the dashboard itself — not the CORS-enabled
+    public-conditions route."""
+    return macro_series_history(series_id)
 
 
 @app.get("/api/state")

@@ -100,6 +100,36 @@ def last_run_times():
     }
 
 
+def macro_series_history(series_id: str):
+    """Full observation history for one series, deduped the same way as
+    every other macro query (latest retrieved_at per date), plus its
+    title/category/units from macro_series for the chart's labels."""
+    meta_rows = safe(
+        "SELECT title, category, units, interpretation FROM macro_series WHERE series_id = %s",
+        (series_id,),
+    )
+    obs_rows = safe(
+        """
+        SELECT DISTINCT ON (observation_date) observation_date, value
+        FROM macro_observations
+        WHERE series_id = %s
+        ORDER BY observation_date, retrieved_at DESC
+        """,
+        (series_id,),
+    )
+    meta = meta_rows[0] if meta_rows else {}
+    return {
+        "series_id": series_id,
+        "title": meta.get("title", series_id),
+        "category": meta.get("category"),
+        "units": meta.get("units"),
+        "observations": [
+            {"date": row["observation_date"].isoformat(), "value": row["value"]}
+            for row in obs_rows
+        ],
+    }
+
+
 def jobs_summary_text(jobs):
     """Short 'N running · N queued' string for the toast, or None if
     nothing is active — completed/failed rows don't count as active."""
