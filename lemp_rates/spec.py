@@ -9,7 +9,7 @@ SERIES_SPECS = {
         "max_freshness_days": 10,
         "description": "Federal Reserve total assets",
     },
-    "fred:RESPPLLOPNWW": {
+    "fred:WRESBAL": {
         "belief": "central_bank_liquidity",
         "direction": 1,
         "weight": 0.30,
