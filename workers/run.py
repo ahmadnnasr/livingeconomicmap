@@ -327,6 +327,42 @@ def process_news_job(
 
         return {"publication_id": publication_id}
 
+    if job_type == "trending_tickers":
+        from lemp_news.adapters import persist_trending_snapshot
+        from lemp_news.trending import fetch_trending_tickers
+
+        entries = fetch_trending_tickers(timeframe="1d")
+        written = persist_trending_snapshot(entries)
+        return {"tickers_written": written}
+
+    if job_type == "ratings_discovery":
+        from datetime import date as _date, timedelta as _timedelta
+
+        from lemp_news.adapters import persist_ratings_snapshot
+        from lemp_news.ratings import fetch_recent_ratings
+
+        to_date = _date.today().isoformat()
+        from_date = (_date.today() - _timedelta(days=7)).isoformat()
+        entries = fetch_recent_ratings(from_date, to_date, min_importance=3)
+        written = persist_ratings_snapshot(entries)
+        return {"ratings_written": written}
+
+    if job_type == "earnings_calendar":
+        from datetime import date as _date, timedelta as _timedelta
+
+        from lemp_news.adapters import load_watchlist, persist_earnings
+        from lemp_news.earnings import fetch_earnings
+
+        watchlist = load_watchlist()
+        if not watchlist:
+            return {"tickers": 0, "events_written": 0, "note": "watchlist is empty"}
+
+        date_from = (_date.today() - _timedelta(days=365)).isoformat()
+        date_to = (_date.today() + _timedelta(days=180)).isoformat()
+        entries = fetch_earnings(watchlist, date_from, date_to)
+        written = persist_earnings(entries)
+        return {"tickers": len(watchlist), "events_written": written}
+
     raise NotImplementedError(
         f"No news handler registered for job_type='{job_type}'."
     )
