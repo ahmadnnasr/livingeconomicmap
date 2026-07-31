@@ -63,7 +63,6 @@ def fetch_news(
         raise BenzingaError("BENZINGA_API_KEY is not configured")
 
     headers = {
-        "Authorization": f"token {settings.benzinga_api_key}",
         "Accept": "application/json",
     }
 
@@ -72,6 +71,7 @@ def fetch_news(
     with httpx.Client(timeout=httpx.Timeout(connect=15.0, read=30.0, write=15.0, pool=15.0)) as client:
         for page in range(max_pages):
             params: dict = {
+                "token": settings.benzinga_api_key,
                 "pageSize": page_size,
                 "page": page,
                 "displayOutput": "full",
