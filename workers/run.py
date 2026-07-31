@@ -271,6 +271,67 @@ def process_publication_job(
     )
 
 
+def process_news_job(
+    job_type: str,
+    payload: dict[str, Any] | None,
+) -> dict[str, Any]:
+    payload = payload or {}
+
+    if job_type == "news_ingestion":
+        from lemp_news.adapters import (
+            cleanup_old_articles,
+            latest_updated_at,
+            load_watchlist,
+            persist_articles,
+        )
+        from lemp_news.benzinga import fetch_news
+
+        scope = payload.get("scope", "holdings")
+        updated_since = latest_updated_at()
+
+        if scope == "holdings":
+            watchlist = load_watchlist()
+            if not watchlist:
+                return {"scope": scope, "articles_written": 0, "note": "watchlist is empty"}
+            articles = fetch_news(tickers=watchlist, updated_since=updated_since)
+        elif scope == "market":
+            articles = fetch_news(tickers=None, updated_since=updated_since)
+        else:
+            raise NotImplementedError(f"Unknown news_ingestion scope='{scope}'")
+
+        written = persist_articles(articles)
+        deleted = cleanup_old_articles()
+
+        return {
+            "scope": scope,
+            "articles_written": written,
+            "old_articles_deleted": deleted,
+        }
+
+    if job_type == "news_digest":
+        from datetime import date as _date
+
+        from lemp_news.adapters import articles_for_digest, load_watchlist, persist_news_digest
+        from lemp_news.digest import generate_news_digest
+
+        as_of_date = payload.get("as_of_date") or _date.today().isoformat()
+        watchlist = load_watchlist()
+        articles = articles_for_digest(hours=24)
+        result = generate_news_digest(articles)
+        publication_id = persist_news_digest(
+            as_of_date,
+            result["digest"],
+            ticker_count=len(watchlist),
+            article_count=len(articles),
+        )
+
+        return {"publication_id": publication_id}
+
+    raise NotImplementedError(
+        f"No news handler registered for job_type='{job_type}'."
+    )
+
+
 def process_job(
     queue_name: str,
     job_type: str,
@@ -296,6 +357,12 @@ def process_job(
             payload=payload,
         )
 
+    if queue_name == "news":
+        return process_news_job(
+            job_type=job_type,
+            payload=payload,
+        )
+
     raise NotImplementedError(
         f"No handler registered for "
         f"queue='{queue_name}', "
@@ -313,6 +380,7 @@ def main() -> None:
             "reasoning",
             "publication",
             "maintenance",
+            "news",
         ],
     )
 
