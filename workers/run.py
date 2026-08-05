@@ -286,6 +286,8 @@ def process_news_job(
         )
         from lemp_news.benzinga import fetch_news
 
+        NEWS_CHANNELS = ["News", "Markets", "Analyst Ratings", "M&A", "Earnings", "WIIM"]
+
         scope = payload.get("scope", "holdings")
         updated_since = latest_updated_at()
 
@@ -293,9 +295,9 @@ def process_news_job(
             watchlist = load_watchlist()
             if not watchlist:
                 return {"scope": scope, "articles_written": 0, "note": "watchlist is empty"}
-            articles = fetch_news(tickers=watchlist, updated_since=updated_since)
+            articles = fetch_news(tickers=watchlist, updated_since=updated_since, channels=NEWS_CHANNELS)
         elif scope == "market":
-            articles = fetch_news(tickers=None, updated_since=updated_since)
+            articles = fetch_news(tickers=None, updated_since=updated_since, channels=NEWS_CHANNELS)
         else:
             raise NotImplementedError(f"Unknown news_ingestion scope='{scope}'")
 
