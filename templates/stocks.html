@@ -10,9 +10,6 @@
 <form method="post" action="/admin/watchlist/add" class="add-ticker-form"><input type="text" name="ticker" placeholder="e.g. NVDA" maxlength="10" required><button type="submit">Add</button></form>
 </article></section>
 
-<section><article><div class="section-head"><div><h2>Price Bars</h2><p class="empty">Daily OHLCV, ~3yr history, for your watchlist. <small class="last-run">Last run: {{ state.last_runs.bars|fmt_et }}</small></p></div><form method="post" action="/admin/run/bars-ingestion"><button type="submit">Run bars ingestion</button></form></div>
-{% for b in state.bars_summary %}<div class="row"><span>{{ b.ticker }} <small class="teaser">{{ b.bar_count }} bars · {{ b.earliest_date }} – {{ b.latest_date }}</small></span><b>{{ '%.2f'|format(b.latest_close) if b.latest_close else '—' }}</b></div>{% else %}<p class="empty">No price bars yet — run ingestion.</p>{% endfor %}
-</article></section>
 
 <section><article><div class="section-head"><div><h2>Earnings Calendar</h2><p class="empty">Upcoming dates + historical EPS surprises for your watchlist. <small class="last-run">Last run: {{ state.last_runs.earnings|fmt_et }}</small></p></div><form method="post" action="/admin/run/earnings-calendar"><button type="submit">Run earnings pull</button></form></div>
 <p class="concept-section-label">Upcoming</p>
