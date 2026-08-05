@@ -42,6 +42,7 @@ def _normalize_article(raw: dict) -> dict:
 def fetch_news(
     tickers: list[str] | None = None,
     updated_since: str | None = None,
+    channels: list[str] | None = None,
     page_size: int = 100,
     max_pages: int = 20,
 ) -> list[dict]:
@@ -54,6 +55,8 @@ def fetch_news(
 
     tickers=None means no ticker filter at all (the "general market, no
     filter" case) — Benzinga's own default behavior for the endpoint.
+    channels=None means no channel filter (pulls every channel); pass a
+    list to restrict to specific channels (e.g. ["News", "Markets", "WIIM"]).
     updated_since should be an RFC-822 or ISO date string; pass the
     highest updated_at already stored to only pull deltas, per Benzinga's
     own recommendation for production use.
@@ -82,6 +85,8 @@ def fetch_news(
                 params["tickers"] = ",".join(tickers)
             if updated_since:
                 params["updatedSince"] = updated_since
+            if channels:
+                params["channels"] = ",".join(channels)
 
             try:
                 response = client.get(BENZINGA_NEWS_URL, params=params, headers=headers)
