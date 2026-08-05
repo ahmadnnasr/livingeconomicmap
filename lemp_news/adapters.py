@@ -243,10 +243,13 @@ def persist_articles(articles: list[dict]) -> int:
 def latest_updated_at() -> str | None:
     """Watermark for incremental Benzinga pulls (updatedSince) — the
     highest updated_at we've already stored, so a repeat pull only asks
-    for deltas rather than re-requesting everything."""
+    for deltas rather than re-requesting everything. Benzinga's backend
+    parses this as a Unix timestamp integer (confirmed from a real 400
+    error: 'strconv.ParseInt: parsing ISO-string: invalid syntax') — NOT
+    an ISO 8601 string, despite that being a more common convention."""
     rows = _safe_fetch("SELECT MAX(updated_at) AS ts FROM news_articles")
     ts = rows[0]["ts"] if rows else None
-    return ts.isoformat() if ts else None
+    return str(int(ts.timestamp())) if ts else None
 
 
 def cleanup_old_articles(retention_days: int = DEFAULT_RETENTION_DAYS) -> int:
