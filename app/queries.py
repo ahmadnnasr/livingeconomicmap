@@ -296,6 +296,15 @@ def stocks_state():
         historical_earnings,
     )
 
+    stocks_jobs = safe(
+        "SELECT status, COUNT(*) AS count FROM jobs WHERE queue IN ('news', 'bars') GROUP BY status"
+    )
+    jobs_active = any(
+        row["status"] in ("queued", "running") and row["count"] > 0
+        for row in stocks_jobs
+    )
+    jobs_summary = jobs_summary_text(stocks_jobs)
+
     bars_rows = safe(
         "SELECT MAX(created_at) AS ts FROM jobs WHERE queue = 'bars' AND job_type = 'bars_ingestion'"
     )
@@ -320,6 +329,8 @@ def stocks_state():
         "ratings": latest_ratings_snapshot(),
         "upcoming_earnings": upcoming_earnings(),
         "historical_earnings": historical_earnings(),
+        "jobs_active": jobs_active,
+        "jobs_summary": jobs_summary,
         "last_runs": {
             "holdings_ingestion": news_last_run("holdings"),
             "market_ingestion": news_last_run("market"),
