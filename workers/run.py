@@ -370,44 +370,6 @@ def process_news_job(
     )
 
 
-def process_bars_job(
-    job_type: str,
-    payload: dict[str, Any] | None,
-) -> dict[str, Any]:
-    if job_type != "bars_ingestion":
-        raise NotImplementedError(
-            f"No bars handler registered for job_type='{job_type}'."
-        )
-
-    from datetime import date as _date, timedelta as _timedelta
-
-    from lemp_news.adapters import load_watchlist, persist_bars
-    from lemp_news.bars import fetch_daily_bars
-
-    payload = payload or {}
-    lookback_days = int(payload.get("lookback_days", 1095))
-
-    watchlist = load_watchlist()
-    if not watchlist:
-        return {"tickers": 0, "bars_written": 0, "note": "watchlist is empty"}
-
-    to_date = _date.today().isoformat()
-    from_date = (_date.today() - _timedelta(days=lookback_days)).isoformat()
-
-    bars_by_ticker = fetch_daily_bars(watchlist, from_date, to_date)
-
-    total_written = 0
-    for ticker, bars in bars_by_ticker.items():
-        total_written += persist_bars(ticker, bars)
-
-    return {
-        "tickers": len(bars_by_ticker),
-        "bars_written": total_written,
-        "from_date": from_date,
-        "to_date": to_date,
-    }
-
-
 def process_job(
     queue_name: str,
     job_type: str,
@@ -439,12 +401,6 @@ def process_job(
             payload=payload,
         )
 
-    if queue_name == "bars":
-        return process_bars_job(
-            job_type=job_type,
-            payload=payload,
-        )
-
     raise NotImplementedError(
         f"No handler registered for "
         f"queue='{queue_name}', "
@@ -463,7 +419,6 @@ def main() -> None:
             "publication",
             "maintenance",
             "news",
-            "bars",
         ],
     )
 
