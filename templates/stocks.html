@@ -61,6 +61,10 @@
 
 </main>
 <div id="job-toast" class="toast"></div>
+<div id="ingestion-progress" class="progress-card">
+  <div id="progress-label" class="progress-label"></div>
+  <div class="progress-track"><div id="progress-bar" class="progress-bar-fill"></div></div>
+</div>
 <script>
 function showView(view) {
   ['holdings','market','wiim','discovery'].forEach(function(v){
@@ -78,6 +82,28 @@ function showView(view) {
   setTimeout(function(){ toast.className = 'toast'; }, 6000);
   if (window.history && window.history.replaceState) {
     window.history.replaceState({}, '', window.location.pathname);
+  }
+})();
+
+(function(){
+  var progressCard = document.getElementById('ingestion-progress');
+  var label = document.getElementById('progress-label');
+  var bar = document.getElementById('progress-bar');
+  var active = {{ 'true' if state.jobs_active else 'false' }};
+  var summary = {{ (state.jobs_summary or 'Working…')|tojson }};
+
+  if (active) {
+    label.textContent = summary;
+    bar.className = 'progress-bar-fill indeterminate';
+    progressCard.className = 'progress-card progress-show';
+    sessionStorage.setItem('lem_stocks_job_active', '1');
+    setTimeout(function(){ window.location.reload(); }, 4000);
+  } else if (sessionStorage.getItem('lem_stocks_job_active') === '1') {
+    sessionStorage.removeItem('lem_stocks_job_active');
+    label.textContent = 'Completed';
+    bar.className = 'progress-bar-fill complete';
+    progressCard.className = 'progress-card progress-show';
+    setTimeout(function(){ progressCard.className = 'progress-card'; }, 3000);
   }
 })();
 </script>
